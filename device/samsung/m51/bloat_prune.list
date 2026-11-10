@@ -1,0 +1,29 @@
+# Heavy logging, telemetry, and non-essential background daemons pruned to ensure 60fps smoothness
+# (Does NOT remove any user-facing features, animations, themes, or UI components)
+
+# Logging & Telemetry Daemons
+system/app/OplusLog
+system/priv-app/OplusLogKit
+system/priv-app/OplusFeedback
+system/priv-app/OplusDCS
+system/app/OplusEngineerMode
+system/priv-app/OplusEngineerNetwork
+system/app/OplusQcomEngineerMode
+system/priv-app/OplusBugReport
+system/priv-app/OplusTrace
+system/app/OplusPerformanceTool
+
+# Carrier & Diagnostic Stubs
+my_carrier/app/*
+my_company/app/*
+my_engineering/app/*
+
+# Factory / Hardware Test APKs
+system/app/OplusSensorTest
+system/app/OplusFactoryTest
+system/app/OplusAutoTest
+
+# Heavy Analytics
+system_ext/priv-app/OplusAthenaLog
+product/priv-app/OplusAppAnalytics
+my_heytap/app/HeyTapAnalytics

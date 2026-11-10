@@ -1,0 +1,97 @@
+# ==============================================================================
+# ColorOS 17 Performance & Smoothness Tweaks for Galaxy M51 (SM7150 / SM-M515F)
+# Designed for maximum fluidity, 60fps animations, full Gaussian blurs, zero-lag
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. UI Rendering, Parallel Animations & Blur Retention (No Compromises!)
+# ------------------------------------------------------------------------------
+# Keep 100% full Gaussian blur across Control Center, App Folders, and Lockscreen
+persist.sys.sf.disable_blur=0
+ro.surface_flinger.supports_background_blur=1
+persist.sys.dynamic_blur=true
+
+# Keep ColorOS Flagship Parallel Processing Animation Engine active
+persist.sys.oplus.animation_level=high
+persist.sys.oplus.anim_performance=1
+persist.sys.oplus.blur_style=flagship
+ro.oplus.systemui.enable_advanced_blur=true
+persist.sys.oplus.fluid_cloud=true
+persist.sys.oplus.aqua_dynamics=true
+
+# SurfaceFlinger Buffer & Latching Scheduling for Butter-Smooth Gestures
+debug.sf.latch_unsignaled=1
+debug.sf.predict_hwc_composition_strategy=1
+debug.sf.high_fps_late_app_phase_offset_ns=1000000
+debug.sf.high_fps_late_sf_phase_offset_ns=1000000
+debug.sf.early_phase_offset_ns=1500000
+debug.sf.early_app_phase_offset_ns=1500000
+debug.sf.early_sf_phase_offset_ns=1500000
+
+# HWUI & Skia GPU Acceleration
+debug.hwui.render_thread=true
+debug.hwui.use_buffer_age=true
+renderthread.skia.reduceopstasksplitting=true
+ro.hwui.render_ahead=true
+ro.hwui.use_vulkan=false
+
+# ------------------------------------------------------------------------------
+# 2. Dalvik VM & ART Heap Tuning for 6GB/8GB RAM (SM7150)
+# ------------------------------------------------------------------------------
+dalvik.vm.heapstartsize=16m
+dalvik.vm.heapgrowthlimit=256m
+dalvik.vm.heapsize=512m
+dalvik.vm.heaptargetutilization=0.75
+dalvik.vm.heapminfree=512k
+dalvik.vm.heapmaxfree=8m
+dalvik.vm.dex2oat-threads=6
+dalvik.vm.image-dex2oat-threads=6
+dalvik.vm.dex2oat-filter=speed-profile
+pm.dexopt.boot-complete=verify
+pm.dexopt.install=speed-profile
+
+# ------------------------------------------------------------------------------
+# 3. CPU Offload: Suppress Heavy Oplus Telemetry & Logging Daemons
+# (Eliminates CPU micro-stutters while preserving all user-facing features)
+# ------------------------------------------------------------------------------
+persist.sys.assert.panic=false
+persist.sys.oplus.assertion.panic=false
+persist.sys.oplus.log.level=0
+persist.sys.dcs.upload=false
+persist.sys.oplus.dcs=0
+persist.sys.olc.enable=false
+persist.sys.oplus.trace.enable=false
+log.tag.stats_log=ERROR
+persist.log.tag=ERROR
+profiler.force_disable_err_rpt=1
+profiler.force_disable_ulog=1
+
+# ------------------------------------------------------------------------------
+# 4. Fingerprint & Biometrics (M51 Side-Mounted Physical Capacitive Sensor)
+# ------------------------------------------------------------------------------
+ro.oplus.display.fp.type=0
+persist.vendor.fingerprint.type=side
+persist.sys.fp.optical=false
+persist.sys.fp.side=true
+ro.hardware.fingerprint=m51
+ro.oplus.biometrics.fingerprint.sensor_type=side
+
+# ------------------------------------------------------------------------------
+# 5. Audio & Dolby Atmos
+# ------------------------------------------------------------------------------
+ro.oplus.audio.support.dolby=true
+ro.oplus.audio.support.spatial=false
+persist.vendor.audio.fluence.voicecall=true
+persist.vendor.audio.fluence.voicerec=false
+persist.vendor.audio.fluence.speaker=true
+
+# ------------------------------------------------------------------------------
+# 6. Telephony & Radio (Disable VoLTE registration loops to save battery)
+# ------------------------------------------------------------------------------
+ro.telephony.default_network=9,9
+persist.vendor.radio.ims_retry=0
+persist.dbg.volte_avail_ovr=0
+persist.dbg.vt_avail_ovr=0
+persist.dbg.wfc_avail_ovr=0
+ro.telephony.call_ring.multiple=false
+telephony.lteOnCdmaDevice=0

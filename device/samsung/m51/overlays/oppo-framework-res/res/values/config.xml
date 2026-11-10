@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fingerprint hardware type: 0 = Capacitive/Physical, 1 = Optical FOD, 2 = Ultrasonic -->
+    <integer name="config_oplus_fingerprint_sensor_type">0</integer>
+    <bool name="config_oplus_support_optical_fingerprint">false</bool>
+    <bool name="config_oplus_support_side_fingerprint">true</bool>
+
+    <!-- Visual Animations & Smoothness (Flagship Tier) -->
+    <bool name="config_oplus_enable_gaussian_blur">true</bool>
+    <bool name="config_oplus_enable_parallel_animation">true</bool>
+    <bool name="config_oplus_enable_aqua_dynamics">true</bool>
+    <bool name="config_oplus_enable_fluid_cloud">true</bool>
+    <integer name="config_oplus_animation_level">3</integer>
+</resources>

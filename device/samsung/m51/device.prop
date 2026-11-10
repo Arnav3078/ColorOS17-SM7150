@@ -1,0 +1,29 @@
+# Device properties for Samsung Galaxy M51 (SM-M515F / SM7150)
+ro.product.brand=samsung
+ro.product.manufacturer=samsung
+ro.product.model=SM-M515F
+ro.product.name=m51snsxx
+ro.product.device=m51
+ro.build.product=m51
+
+# Hardware Platform
+ro.board.platform=sm7150
+ro.hardware=qcom
+ro.soc.manufacturer=QTI
+ro.soc.model=SM7150
+ro.arch=arm64-v8a
+
+# Display & Panel
+ro.sf.lcd_density=420
+persist.sys.sf.color_saturation=1.0
+ro.surface_flinger.has_wide_color_display=true
+ro.surface_flinger.has_HDR_display=true
+ro.surface_flinger.max_frame_buffer_acquired_buffers=3
+
+# Fingerprint Sensor Mapping (Side Capacitive for M51)
+# Note: Flagship donor has under-display FOD; M51 has physical side-mounted sensor
+ro.oplus.display.fp.type=0
+persist.vendor.fingerprint.type=side
+ro.hardware.fingerprint=m51
+persist.sys.fp.optical=false
+persist.sys.fp.side=true

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Samsung Galaxy M51 7000mAh Massive Battery Profile -->
+    <integer name="config_criticalBatteryWarningLevel">5</integer>
+    <integer name="config_lowBatteryWarningLevel">15</integer>
+    <integer name="config_lowBatteryCloseWarningLevel">20</integer>
+
+    <!-- Center Punch Hole Display Cutout for Galaxy M51 (1080x2400) -->
+    <string translatable="false" name="config_mainBuiltInDisplayCutout">
+        M 0,0
+        H 500
+        V 0
+        H 580
+        V 80
+        H 500
+        Z
+        @left
+    </string>
+
+    <!-- Corner Radius -->
+    <dimen name="rounded_corner_radius">36dp</dimen>
+    <dimen name="rounded_corner_radius_top">36dp</dimen>
+    <dimen name="rounded_corner_radius_bottom">36dp</dimen>
+
+    <!-- Status Bar Padding for Center Punch Hole Cutout -->
+    <dimen name="status_bar_height_portrait">36dp</dimen>
+    <dimen name="status_bar_height_landscape">24dp</dimen>
+
+    <!-- Support Ambient Display / Always-On Display for Super AMOLED Plus -->
+    <bool name="config_dozeAlwaysOnDisplayAvailable">true</bool>
+    <bool name="config_displayBlanksAfterDoze">false</bool>
+
+    <!-- Disable optical fingerprint FOD on screen (M51 uses side sensor) -->
+    <bool name="config_supportsInDisplayFingerprint">false</bool>
+</resources>

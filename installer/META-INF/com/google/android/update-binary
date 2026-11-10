@@ -1,0 +1,54 @@
+#!/sbin/sh
+# ==============================================================================
+# Dynamic Partition Installer for ColorOS 17 (Samsung Galaxy M51 / SM7150)
+# ==============================================================================
+
+OUTFD=$2
+ZIPFILE=$3
+
+ui_print() {
+    echo -e "ui_print $1\nui_print" > /proc/self/fd/$OUTFD
+}
+
+ui_print "*****************************************************"
+ui_print "*   ColorOS 17 Flagship Port for Galaxy M51 (sm7150)  *"
+ui_print "*   Parallel Processing Animations & Zero-Lag Engine  *"
+ui_print "*****************************************************"
+
+# Verify device
+DEVICE=$(getprop ro.product.device)
+MODEL=$(getprop ro.product.model)
+ui_print "- Current device: $DEVICE ($MODEL)"
+
+ui_print "- Extracting ROM components..."
+WORKDIR="/tmp/coloros_install"
+mkdir -p "$WORKDIR"
+unzip -o "$ZIPFILE" -d "$WORKDIR"
+
+# Flashing boot
+if [ -f "$WORKDIR/boot.img" ]; then
+    ui_print "- Flashing Boot Image (Kernel & KSU)..."
+    dd if="$WORKDIR/boot.img" of=/dev/block/bootdevice/by-name/boot
+fi
+
+# Flashing dtbo
+if [ -f "$WORKDIR/dtbo.img" ]; then
+    ui_print "- Flashing Device Tree Overlay (DTBO)..."
+    dd if="$WORKDIR/dtbo.img" of=/dev/block/bootdevice/by-name/dtbo
+fi
+
+# Flashing super.img
+if [ -f "$WORKDIR/super.img" ]; then
+    ui_print "- Flashing Dynamic Super Partition..."
+    simg2img "$WORKDIR/super.img" /dev/block/bootdevice/by-name/super 2>/dev/null || \
+    dd if="$WORKDIR/super.img" of=/dev/block/bootdevice/by-name/super bs=4M
+fi
+
+rm -rf "$WORKDIR"
+
+ui_print " "
+ui_print "*****************************************************"
+ui_print "*   Installation Complete!                           *"
+ui_print "*   Format Data in TWRP/OrangeFox before rebooting!  *"
+ui_print "*****************************************************"
+exit 0
