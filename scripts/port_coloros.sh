@@ -98,26 +98,26 @@ echo "[3/6] Unpacking partitions for modification..."
 
 DONOR_PARTITIONS=(system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering)
 
-# Extract only system partition for deep modification (build.prop, sepolicy, init scripts)
-# This guarantees untouched partitions retain 100% original binary integrity without 8KB corruption
+# Extract system partition with full xattrs and SELinux contexts
 SYSTEM_IMG="$DONOR_EXTRACT/system.img"
 SYSTEM_DIR="$WORK_DIR/system"
+sudo rm -rf "$SYSTEM_DIR"
 mkdir -p "$SYSTEM_DIR"
 
 if [ -f "$SYSTEM_IMG" ]; then
-    echo " -> Unpacking system.img..."
+    echo " -> Unpacking system.img with full xattrs and root ownership..."
     UNPACKED=false
-    if command -v fsck.erofs >/dev/null 2>&1 && fsck.erofs --extract="$SYSTEM_DIR" "$SYSTEM_IMG" 2>/dev/null; then
-        if [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
-            echo " -> Successfully extracted system.img with fsck.erofs"
+    if command -v fsck.erofs >/dev/null 2>&1 && sudo fsck.erofs --extract="$SYSTEM_DIR" --xattrs "$SYSTEM_IMG" 2>/dev/null; then
+        if [ "$(sudo ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+            echo " -> Successfully extracted system.img with fsck.erofs (xattrs preserved)"
             UNPACKED=true
         fi
     fi
     if [ "$UNPACKED" = false ]; then
         if sudo mount -o loop,ro "$SYSTEM_IMG" "$MNT_DIR" 2>/dev/null; then
-            cp -a "$MNT_DIR"/* "$SYSTEM_DIR/" 2>/dev/null || true
+            sudo cp -a "$MNT_DIR"/* "$SYSTEM_DIR/" 2>/dev/null || true
             sudo umount "$MNT_DIR" 2>/dev/null || true
-            if [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+            if [ "$(sudo ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
                 echo " -> Successfully mounted and copied system.img"
                 UNPACKED=true
             fi
@@ -138,17 +138,18 @@ for part in "${DONOR_PARTITIONS[@]}"; do
     if [ "$part" = "my_stock" ]; then
         echo " -> Optimizing and compressing my_stock with LZ4HC..."
         STOCK_DIR="$WORK_DIR/my_stock"
+        sudo rm -rf "$STOCK_DIR"
         mkdir -p "$STOCK_DIR"
-        fsck.erofs --extract="$STOCK_DIR" "$SRC_IMG" 2>/dev/null || \
-        sudo mount -o loop,ro "$SRC_IMG" "$MNT_DIR" 2>/dev/null && cp -a "$MNT_DIR"/* "$STOCK_DIR/" 2>/dev/null && sudo umount "$MNT_DIR" 2>/dev/null || \
+        sudo fsck.erofs --extract="$STOCK_DIR" --xattrs "$SRC_IMG" 2>/dev/null || \
+        (sudo mount -o loop,ro "$SRC_IMG" "$MNT_DIR" 2>/dev/null && sudo cp -a "$MNT_DIR"/* "$STOCK_DIR/" 2>/dev/null && sudo umount "$MNT_DIR" 2>/dev/null) || \
         7z x "$SRC_IMG" -o"$STOCK_DIR" -y >/dev/null 2>&1 || true
         
-        if [ "$(ls -A "$STOCK_DIR" 2>/dev/null)" ]; then
+        if [ "$(sudo ls -A "$STOCK_DIR" 2>/dev/null)" ]; then
             # Prune non-essential preloaded carrier demo packages to fit M51 super partition
-            rm -rf "$STOCK_DIR/del-app" "$STOCK_DIR/non_overlay" 2>/dev/null || true
-            mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMAGES/my_stock.img" "$STOCK_DIR" 2>/dev/null || \
+            sudo rm -rf "$STOCK_DIR/del-app" "$STOCK_DIR/non_overlay" 2>/dev/null || true
+            sudo mkfs.erofs --all-root -z lz4hc,9 -C 65536 "$OUT_IMAGES/my_stock.img" "$STOCK_DIR" 2>/dev/null || \
             cp -f "$SRC_IMG" "$OUT_IMAGES/my_stock.img"
-            rm -rf "$STOCK_DIR"
+            sudo rm -rf "$STOCK_DIR"
         else
             cp -f "$SRC_IMG" "$OUT_IMAGES/my_stock.img"
         fi
@@ -158,23 +159,55 @@ for part in "${DONOR_PARTITIONS[@]}"; do
     fi
 done
 
-# Copy Vendor, ODM and Kernel from Base
+# Prepare Samsung Stock Vendor & ODM (Keep Vendor as pristine EXT4, remove recovery scripts & patch fstab)
 if [ -f "$BASE_EXTRACT/vendor.img" ]; then
-    echo " -> Optimizing Base vendor.img as EROFS..."
-    VENDOR_DIR="$WORK_DIR/vendor"
-    mkdir -p "$VENDOR_DIR"
-    sudo mount -o loop,ro "$BASE_EXTRACT/vendor.img" "$MNT_DIR" 2>/dev/null && \
-    cp -a "$MNT_DIR"/* "$VENDOR_DIR/" 2>/dev/null && \
-    sudo umount "$MNT_DIR" 2>/dev/null || \
-    7z x "$BASE_EXTRACT/vendor.img" -o"$VENDOR_DIR" -y >/dev/null 2>&1 || true
+    echo " -> Preparing Base vendor.img as original EXT4 with ColorOS fstab..."
     
-    if [ "$(ls -A "$VENDOR_DIR" 2>/dev/null)" ]; then
-        mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMAGES/vendor.img" "$VENDOR_DIR" 2>/dev/null || \
-        cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
-        rm -rf "$VENDOR_DIR"
-    else
-        cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
+    # Unsparse vendor.img if needed
+    if simg2img "$BASE_EXTRACT/vendor.img" "$BASE_EXTRACT/vendor_raw.img" 2>/dev/null; then
+        mv -f "$BASE_EXTRACT/vendor_raw.img" "$BASE_EXTRACT/vendor.img"
     fi
+    
+    sudo mkdir -p "$MNT_DIR"
+    if sudo mount -o loop,rw "$BASE_EXTRACT/vendor.img" "$MNT_DIR" 2>/dev/null; then
+        echo "   * Mounted vendor.img rw; removing recovery overwriter scripts (prevents TWRP hang)..."
+        sudo rm -f "$MNT_DIR/recovery-from-boot.p" "$MNT_DIR/bin/install-recovery.sh" "$MNT_DIR/etc/init/vendor_flash_recovery.rc"
+        
+        # Patch vendor fstab files for dynamic partitions, EROFS support & remove ICE encryption
+        for fstab in "$MNT_DIR/etc/fstab.default" "$MNT_DIR/etc/fstab.emmc"; do
+            [ ! -f "$fstab" ] && continue
+            echo "   * Patching $(basename "$fstab") for ColorOS dynamic partitions and EROFS..."
+            
+            # Remove Samsung hardware ICE encryption flag so unencrypted/clean formatted /data mounts
+            sudo sed -i 's/fileencryption=ice/encryptable/g' "$fstab"
+            
+            # Remove AVB verification flags that fail on custom/ported dynamic partitions
+            sudo sed -i 's/,avb=vbmeta//g' "$fstab"
+            sudo sed -i 's/,avb//g' "$fstab"
+            sudo sed -i 's/,avb_keys=[^ \t]*//g' "$fstab"
+            
+            # Ensure system, system_ext, product have erofs entries
+            if ! grep -q "^system.*erofs" "$fstab"; then
+                sudo sed -i '/^system[ \t]/i system\t\/system\terofs\tro\twait,logical,first_stage_mount' "$fstab"
+            fi
+            if ! grep -q "^product.*erofs" "$fstab"; then
+                sudo sed -i '/^product[ \t]/i product\t\/product\terofs\tro\twait,logical,first_stage_mount' "$fstab"
+            fi
+            if ! grep -q "^system_ext" "$fstab"; then
+                sudo sed -i '/^system[ \t]/i system_ext\t\/system_ext\terofs\tro\twait,logical,first_stage_mount\nsystem_ext\t\/system_ext\text4\tro\twait,logical,first_stage_mount' "$fstab"
+            fi
+            
+            # Add ColorOS specific dynamic partitions with nofail
+            for cpart in my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_engineering; do
+                if ! grep -q "^$cpart" "$fstab"; then
+                    echo -e "$cpart\t/$cpart\terofs\tro\twait,logical,first_stage_mount,nofail" | sudo tee -a "$fstab" >/dev/null
+                fi
+            done
+        done
+        
+        sudo umount "$MNT_DIR"
+    fi
+    cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
 fi
 if [ -f "$BASE_EXTRACT/odm.img" ]; then
     echo " -> Copying Base odm.img..."
@@ -209,14 +242,14 @@ fi
 if [ ${#SYSTEM_PROPS[@]} -gt 0 ]; then
     for sprop in "${SYSTEM_PROPS[@]}"; do
         echo " -> Injecting device identifiers into $sprop..."
-        cat "$DEVICE_DIR/device.prop" >> "$sprop"
+        sudo bash -c "cat '$DEVICE_DIR/device.prop' >> '$sprop'"
         echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks into $sprop..."
-        cat "$DEVICE_DIR/tweaks.prop" >> "$sprop"
+        sudo bash -c "cat '$DEVICE_DIR/tweaks.prop' >> '$sprop'"
     done
 else
     echo "[WARN] system/build.prop not found; creating default prop overlay..."
-    mkdir -p "$SYSTEM_DIR/system/etc"
-    cat "$DEVICE_DIR/device.prop" "$DEVICE_DIR/tweaks.prop" >> "$SYSTEM_DIR/system/etc/prop.default" 2>/dev/null || true
+    sudo mkdir -p "$SYSTEM_DIR/system/etc"
+    sudo bash -c "cat '$DEVICE_DIR/device.prop' '$DEVICE_DIR/tweaks.prop' >> '$SYSTEM_DIR/system/etc/prop.default'" 2>/dev/null || true
 fi
 
 # 4.2 Prune Heavy Telemetry & Background Logger Daemons (Zero-Lag Engine)
@@ -227,7 +260,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     for candidate in "$SYSTEM_DIR/$line" "$SYSTEM_DIR/$clean_line" "$SYSTEM_DIR/system/$clean_line"; do
         if [ -e "$candidate" ]; then
             echo "    Pruning bloat daemon: $candidate"
-            rm -rf "$candidate"
+            sudo rm -rf "$candidate"
         fi
     done
 done < "$DEVICE_DIR/bloat_prune.list"
@@ -237,7 +270,7 @@ if [ -f "$DEVICE_DIR/sepolicy/m51.cil" ]; then
     echo " -> Injecting SELinux compatibility policy..."
     SEPOL_FILE=$(find "$SYSTEM_DIR" -name "plat_sepolicy.cil" 2>/dev/null | head -n 1)
     if [ -n "$SEPOL_FILE" ]; then
-        cat "$DEVICE_DIR/sepolicy/m51.cil" >> "$SEPOL_FILE"
+        sudo bash -c "cat '$DEVICE_DIR/sepolicy/m51.cil' >> '$SEPOL_FILE'"
     fi
 fi
 
@@ -245,20 +278,30 @@ fi
 echo " -> Neutralizing conflicting Oplus TEE / Keystore triggers in init scripts..."
 find "$SYSTEM_DIR" -type f -name "*.rc" 2>/dev/null | while read -r rcfile; do
     if grep -q "oplus_teesim_daemon" "$rcfile" 2>/dev/null; then
-        sed -i 's/service oplus_teesim_daemon/service oplus_teesim_daemon \/system\/bin\/true\n    disabled/g' "$rcfile"
+        sudo sed -i 's/service oplus_teesim_daemon/service oplus_teesim_daemon \/system\/bin\/true\n    disabled/g' "$rcfile"
     fi
 done
 
 # ------------------------------------------------------------------------------
-# Step 5: Repack System Partition
+# Step 5: Repack System Partition with Full SELinux & Root Ownership
 # ------------------------------------------------------------------------------
-echo "[5/6] Repacking system partition ($REPACK_TYPE)..."
+echo "[5/6] Repacking system partition with --all-root and plat_file_contexts ($REPACK_TYPE)..."
 
 OUT_SYS_IMG="$OUT_IMAGES/system.img"
-if [ -d "$SYSTEM_DIR" ] && [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
-    echo " -> Repacking system as $REPACK_TYPE..."
-    mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_SYS_IMG" "$SYSTEM_DIR" 2>/dev/null || \
-    cp -f "$DONOR_EXTRACT/system.img" "$OUT_SYS_IMG"
+if [ -d "$SYSTEM_DIR" ] && [ "$(sudo ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+    echo " -> Ensuring root ownership across system tree..."
+    sudo chown -R 0:0 "$SYSTEM_DIR" 2>/dev/null || true
+    
+    PLAT_FC=$(find "$SYSTEM_DIR" -name "plat_file_contexts" 2>/dev/null | head -n 1)
+    echo " -> Found plat_file_contexts: ${PLAT_FC:-none}"
+    
+    echo " -> Repacking system as $REPACK_TYPE (enforcing root UID/GID & cryptographic SELinux labels)..."
+    if [ -n "$PLAT_FC" ]; then
+        sudo mkfs.erofs --all-root --file-contexts="$PLAT_FC" -z lz4hc,9 -C 65536 "$OUT_SYS_IMG" "$SYSTEM_DIR" 2>/dev/null || \
+        sudo mkfs.erofs --all-root -z lz4hc,9 -C 65536 "$OUT_SYS_IMG" "$SYSTEM_DIR"
+    else
+        sudo mkfs.erofs --all-root -z lz4hc,9 -C 65536 "$OUT_SYS_IMG" "$SYSTEM_DIR"
+    fi
 else
     echo " -> Retaining original system.img..."
     cp -f "$DONOR_EXTRACT/system.img" "$OUT_SYS_IMG"
