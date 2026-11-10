@@ -48,14 +48,6 @@ Any form of contribution, suggestions, bug report or feature request for the pro
 - KernelSU / Next-KernelSU root integration support
 - HWUI and SurfaceFlinger rendering optimizations for zero-lag gesture flings
 
-# How to build
-This project builds automatically via GitHub Actions:
-1. Open this repository on GitHub.
-2. Go to the **Actions** tab.
-3. Select the **Build ColorOS 17 for Galaxy M51** workflow.
-4. Click **Run workflow** (default links are preconfigured, or provide your own donor/base links).
-5. Once the build finishes, download the flashable zip from GitHub Releases or the GoFile direct link.
-
 # Licensing
 This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE). External dependencies might be distributed under a different license, such as:
 - [android-tools](https://github.com/nmeum/android-tools), licensed under the [Apache License 2.0](https://github.com/nmeum/android-tools/blob/master/LICENSE)
@@ -67,8 +59,5 @@ This project is licensed under the terms of the [GNU General Public License v3.0
 # Credits
 A special thanks goes to the following for their invaluable contributions in no particular order:
 - **[toraidl](https://github.com/toraidl)** for ColorOS porting research and tools
-- **[Mehedi H Joy](https://github.com/mehedihjoy0)** for the base for m51
-- **[Pascua](https://github.com/pascua28)** for patches made for a71
-- **[salvogiangri](https://github.com/salvogiangri)** and the **UN1CA Team** for inspiration and SM7150 foundation
 - **OPPO & OnePlus** for ColorOS and OxygenOS
 - *All SM7150 developers, testers and contributors ❤️*
