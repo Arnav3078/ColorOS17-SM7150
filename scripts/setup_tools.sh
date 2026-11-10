@@ -19,8 +19,34 @@ if [ ! -f "lpmake" ] || [ ! -f "lpunpack" ]; then
     chmod +x lpmake lpunpack
 fi
 
-# Download required shared libraries for lpmake (libbase.so, libc++.so, liblp.so, etc.)
-LIBS=(libbase.so libc++.so liblp.so liblog.so libsparse-host.so libcrypto-host.so libcutils.so libz-host.so)
+# Download complete shared libraries for dynamic partition tools (lpmake, lpunpack)
+LIBS=(
+    libbase.so
+    libbrillo-stream.so
+    libbrillo.so
+    libc++.so
+    libchrome.so
+    libcrypto-host.so
+    libcrypto_utils.so
+    libcutils.so
+    libevent-host.so
+    libext2_com_err-host.so
+    libext2fs-host.so
+    libext4_utils.so
+    libfec.so
+    liblog.so
+    liblp.so
+    liblz4.so
+    libpcre2.so
+    libprocessgroup.so
+    libprotobuf-cpp-lite.so
+    libselinux.so
+    libsparse-host.so
+    libsquashfs_utils.so
+    libssl-host.so
+    libz-host.so
+    libziparchive.so
+)
 for lib in "${LIBS[@]}"; do
     if [ ! -f "$LIB_DIR/$lib" ]; then
         curl -sSL "https://raw.githubusercontent.com/toraidl/coloros_port/COS17/otatools/lib64/$lib" -o "$LIB_DIR/$lib" 2>/dev/null || true

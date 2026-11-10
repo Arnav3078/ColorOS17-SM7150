@@ -37,11 +37,23 @@ if [ -f "$WORKDIR/dtbo.img" ]; then
     dd if="$WORKDIR/dtbo.img" of=/dev/block/bootdevice/by-name/dtbo
 fi
 
-# Flashing super.img
+# Flashing dynamic partitions
 if [ -f "$WORKDIR/super.img" ]; then
     ui_print "- Flashing Dynamic Super Partition..."
     simg2img "$WORKDIR/super.img" /dev/block/bootdevice/by-name/super 2>/dev/null || \
     dd if="$WORKDIR/super.img" of=/dev/block/bootdevice/by-name/super bs=4M
+else
+    ui_print "- Flashing individual dynamic partitions..."
+    for p in system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering vendor odm; do
+        if [ -f "$WORKDIR/${p}.img" ]; then
+            BLOCK_DEV=$(find /dev/block/mapper -name "$p" 2>/dev/null | head -n 1)
+            [ -z "$BLOCK_DEV" ] && BLOCK_DEV="/dev/block/by-name/$p"
+            if [ -b "$BLOCK_DEV" ]; then
+                ui_print "  -> Flashing $p..."
+                dd if="$WORKDIR/${p}.img" of="$BLOCK_DEV" bs=4M 2>/dev/null || true
+            fi
+        fi
+    done
 fi
 
 rm -rf "$WORKDIR"

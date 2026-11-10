@@ -25,10 +25,18 @@ if exist dtbo.img (
 )
 
 echo.
-echo [3/4] Flashing Dynamic Super Partition...
+echo [3/4] Flashing Dynamic Partitions...
 if exist super.img (
     echo - Flashing super.img (this may take several minutes)...
     fastboot flash super super.img
+) else (
+    echo - Flashing individual dynamic partitions...
+    for %%P in (system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering vendor odm) do (
+        if exist %%P.img (
+            echo   - Flashing %%P.img...
+            fastboot flash %%P %%P.img
+        )
+    )
 )
 
 echo.

@@ -154,12 +154,24 @@ fi
 echo "[4/6] Applying Galaxy M51 Adaptations & Performance Engine..."
 
 # 4.1 Device Properties & Identifiers
-SYSTEM_PROP=$(find "$SYSTEM_DIR" -name "build.prop" 2>/dev/null | head -n 1)
-if [ -n "$SYSTEM_PROP" ]; then
-    echo " -> Injecting device identifiers into $SYSTEM_PROP..."
-    cat "$DEVICE_DIR/device.prop" >> "$SYSTEM_PROP"
-    echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks into $SYSTEM_PROP..."
-    cat "$DEVICE_DIR/tweaks.prop" >> "$SYSTEM_PROP"
+SYSTEM_PROPS=()
+for p in "$SYSTEM_DIR/system/build.prop" "$SYSTEM_DIR/build.prop" "$SYSTEM_DIR/system/etc/build.prop" "$SYSTEM_DIR/etc/build.prop"; do
+    [ -f "$p" ] && SYSTEM_PROPS+=("$p")
+done
+
+if [ ${#SYSTEM_PROPS[@]} -eq 0 ]; then
+    while IFS= read -r f; do
+        [ -n "$f" ] && SYSTEM_PROPS+=("$f")
+    done < <(find "$SYSTEM_DIR" -name "build.prop" ! -path "*/system_dlkm/*" 2>/dev/null)
+fi
+
+if [ ${#SYSTEM_PROPS[@]} -gt 0 ]; then
+    for sprop in "${SYSTEM_PROPS[@]}"; do
+        echo " -> Injecting device identifiers into $sprop..."
+        cat "$DEVICE_DIR/device.prop" >> "$sprop"
+        echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks into $sprop..."
+        cat "$DEVICE_DIR/tweaks.prop" >> "$sprop"
+    done
 else
     echo "[WARN] system/build.prop not found; creating default prop overlay..."
     mkdir -p "$SYSTEM_DIR/system/etc"
