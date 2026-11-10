@@ -55,15 +55,17 @@ echo "[INFO] Total super partition data size: $TOTAL_PART_SIZE bytes (Max Group:
 
 # If total size fits in super partition, run lpmake
 if [ "$TOTAL_PART_SIZE" -le "$GROUP_SIZE" ]; then
-    LPMAKE_ARGS+=(--sparse --output "$OUT_IMAGES/super.img")
-    echo "[INFO] Executing lpmake..."
+    LPMAKE_ARGS+=(--output "$OUT_IMAGES/super.img")
+    echo "[INFO] Executing lpmake (generating raw super.img for direct dd flashing)..."
     if "$LPMAKE" "${LPMAKE_ARGS[@]}"; then
         echo "[SUCCESS] Dynamic super.img built successfully!"
     else
-        echo "[WARN] lpmake failed, packaging individual sparse images..."
+        echo "[ERROR] lpmake failed to build super.img!"
+        exit 1
     fi
 else
-    echo "[WARN] Partition contents exceed physical super partition size ($TOTAL_PART_SIZE > $GROUP_SIZE). Packaging dynamic partitions for sparse flashing..."
+    echo "[ERROR] Partition contents exceed physical super partition size ($TOTAL_PART_SIZE > $GROUP_SIZE)!"
+    exit 1
 fi
 
 # ------------------------------------------------------------------------------
@@ -85,13 +87,18 @@ cp -f "$INSTALLER_DIR/flash_all.sh" "$ZIP_TEMP/"
 # Copy firmware / boot images
 [ -f "$OUT_IMAGES/boot.img" ] && cp -f "$OUT_IMAGES/boot.img" "$ZIP_TEMP/boot.img"
 [ -f "$OUT_IMAGES/dtbo.img" ] && cp -f "$OUT_IMAGES/dtbo.img" "$ZIP_TEMP/dtbo.img"
-[ -f "$OUT_IMAGES/vbmeta.img" ] && cp -f "$OUT_IMAGES/vbmeta.img" "$ZIP_TEMP/vbmeta.img" || ([ -f "$INSTALLER_DIR/vbmeta.img" ] && cp -f "$INSTALLER_DIR/vbmeta.img" "$ZIP_TEMP/vbmeta.img" || true)
+
+if [ -f "$OUT_IMAGES/vbmeta.img" ]; then
+    cp -f "$OUT_IMAGES/vbmeta.img" "$ZIP_TEMP/vbmeta.img"
+elif [ -f "$INSTALLER_DIR/vbmeta.img" ]; then
+    cp -f "$INSTALLER_DIR/vbmeta.img" "$ZIP_TEMP/vbmeta.img"
+fi
 
 if [ -f "$OUT_IMAGES/super.img" ]; then
     cp -f "$OUT_IMAGES/super.img" "$ZIP_TEMP/super.img"
 else
-    echo "[INFO] Copying individual partition images into zip..."
-    cp -f "$OUT_IMAGES"/*.img "$ZIP_TEMP/"
+    echo "[ERROR] super.img was not generated!"
+    exit 1
 fi
 
 # Create ZIP

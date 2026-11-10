@@ -26,6 +26,7 @@ if exist dtbo.img (
 if exist vbmeta.img (
     echo - Flashing vbmeta.img (disabling AVB)...
     fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
+    fastboot --disable-verity --disable-verification flash vbmeta_samsung vbmeta.img 2>nul
 )
 
 echo.

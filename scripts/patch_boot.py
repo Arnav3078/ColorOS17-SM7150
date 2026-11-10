@@ -68,11 +68,10 @@ def patch_boot_image(boot_path, out_path):
                 if 'fileencryption=ice' in line:
                     line = line.replace('fileencryption=ice', 'encryptable')
 
-                # Strip AVB on dynamic partitions
-                if any(line.startswith(p) for p in ['system', 'product', 'vendor', 'odm']):
-                    line = re.sub(r',avb_keys=[^\s]+', '', line)
-                    line = re.sub(r',avb=[^\s,]+', '', line)
-                    line = re.sub(r',avb\b', '', line)
+                # Strip AVB on all partitions (avoids early mount kernel panic on custom ROMs)
+                line = re.sub(r',avb_keys=[^\s]+', '', line)
+                line = re.sub(r',avb=[^\s,]+', '', line)
+                line = re.sub(r',avb\b', '', line)
 
                 if line.startswith('system\t') and 'erofs' in line:
                     has_erofs_sys = True

@@ -10,6 +10,16 @@ ui_print() {
     echo -e "ui_print $1\nui_print" > /proc/self/fd/$OUTFD
 }
 
+find_block() {
+    for b in "/dev/block/bootdevice/by-name/$1" "/dev/block/by-name/$1" "/dev/block/platform/soc/1d84000.ufshc/by-name/$1" "/dev/block/platform/soc/*/by-name/$1"; do
+        if [ -b "$b" ]; then
+            echo "$b"
+            return 0
+        fi
+    done
+    return 1
+}
+
 ui_print "*****************************************************"
 ui_print "*   ColorOS 17 Flagship Port for Galaxy M51 (sm7150)  *"
 ui_print "*   Parallel Processing Animations & Zero-Lag Engine  *"
@@ -27,61 +37,85 @@ mkdir -p "$WORKDIR" 2>/dev/null || WORKDIR="/tmp/coloros_install"
 mkdir -p "$WORKDIR"
 
 # Flashing boot
-ui_print "- Extracting & Flashing Boot Image (Kernel & KSU)..."
-unzip -o "$ZIPFILE" boot.img -d "$WORKDIR" >/dev/null 2>&1 || true
-if [ -f "$WORKDIR/boot.img" ]; then
-    dd if="$WORKDIR/boot.img" of=/dev/block/bootdevice/by-name/boot bs=4M
-    rm -f "$WORKDIR/boot.img"
+BOOT_BLK=$(find_block boot)
+if [ -n "$BOOT_BLK" ]; then
+    ui_print "- Extracting & Flashing Boot Image (Kernel & KSU)..."
+    unzip -o "$ZIPFILE" boot.img -d "$WORKDIR" >/dev/null 2>&1 || true
+    if [ -f "$WORKDIR/boot.img" ]; then
+        dd if="$WORKDIR/boot.img" of="$BOOT_BLK" bs=4M conv=fsync
+        rm -f "$WORKDIR/boot.img"
+    fi
 fi
 
 # Flashing dtbo
-ui_print "- Extracting & Flashing Device Tree Overlay (DTBO)..."
-unzip -o "$ZIPFILE" dtbo.img -d "$WORKDIR" >/dev/null 2>&1 || true
-if [ -f "$WORKDIR/dtbo.img" ]; then
-    dd if="$WORKDIR/dtbo.img" of=/dev/block/bootdevice/by-name/dtbo bs=4M
-    rm -f "$WORKDIR/dtbo.img"
+DTBO_BLK=$(find_block dtbo)
+if [ -n "$DTBO_BLK" ]; then
+    ui_print "- Extracting & Flashing Device Tree Overlay (DTBO)..."
+    unzip -o "$ZIPFILE" dtbo.img -d "$WORKDIR" >/dev/null 2>&1 || true
+    if [ -f "$WORKDIR/dtbo.img" ]; then
+        dd if="$WORKDIR/dtbo.img" of="$DTBO_BLK" bs=4M conv=fsync
+        rm -f "$WORKDIR/dtbo.img"
+    fi
 fi
 
-# Flashing vbmeta (AVB disabled)
-ui_print "- Extracting & Flashing AVB-Disabled VBMETA..."
+# Flashing vbmeta (AVB disabled flags: 0x00000003)
+VBMETA_BLK=$(find_block vbmeta)
 unzip -o "$ZIPFILE" vbmeta.img -d "$WORKDIR" >/dev/null 2>&1 || true
 if [ -f "$WORKDIR/vbmeta.img" ]; then
-    dd if="$WORKDIR/vbmeta.img" of=/dev/block/bootdevice/by-name/vbmeta bs=4M 2>/dev/null || true
+    ui_print "- Extracting & Flashing AVB-Disabled VBMETA..."
+    [ -n "$VBMETA_BLK" ] && dd if="$WORKDIR/vbmeta.img" of="$VBMETA_BLK" bs=4M conv=fsync 2>/dev/null || true
+    VBMETA_SAM_BLK=$(find_block vbmeta_samsung)
+    [ -n "$VBMETA_SAM_BLK" ] && dd if="$WORKDIR/vbmeta.img" of="$VBMETA_SAM_BLK" bs=4M conv=fsync 2>/dev/null || true
     rm -f "$WORKDIR/vbmeta.img"
 fi
 
 # Flashing dynamic partitions
-ui_print "- Extracting & Flashing Dynamic Super Partition (may take a few minutes)..."
-unzip -o "$ZIPFILE" super.img -d "$WORKDIR" >/dev/null 2>&1 || true
-if [ -f "$WORKDIR/super.img" ]; then
-    simg2img "$WORKDIR/super.img" /dev/block/bootdevice/by-name/super 2>/dev/null || \
-    dd if="$WORKDIR/super.img" of=/dev/block/bootdevice/by-name/super bs=4M
-    rm -f "$WORKDIR/super.img"
-else
-    ui_print "- Flashing individual dynamic partitions..."
-    for p in system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering vendor odm; do
-        unzip -o "$ZIPFILE" "${p}.img" -d "$WORKDIR" >/dev/null 2>&1 || true
-        if [ -f "$WORKDIR/${p}.img" ]; then
-            BLOCK_DEV=$(find /dev/block/mapper -name "$p" 2>/dev/null | head -n 1)
-            [ -z "$BLOCK_DEV" ] && BLOCK_DEV="/dev/block/by-name/$p"
-            if [ -b "$BLOCK_DEV" ]; then
-                ui_print "  -> Flashing $p..."
-                dd if="$WORKDIR/${p}.img" of="$BLOCK_DEV" bs=4M 2>/dev/null || true
-            fi
-            rm -f "$WORKDIR/${p}.img"
+SUPER_BLK=$(find_block super)
+if [ -n "$SUPER_BLK" ]; then
+    ui_print "- Extracting & Flashing Dynamic Super Partition..."
+    ui_print "  (Target: $SUPER_BLK - large image, takes 2-3 minutes)"
+    unzip -o "$ZIPFILE" super.img -d "$WORKDIR" >/dev/null 2>&1 || true
+    if [ -f "$WORKDIR/super.img" ]; then
+        # Check if sparse (magic 0xED26FF3A)
+        MAGIC=$(od -A n -N 4 -t x4 "$WORKDIR/super.img" 2>/dev/null | tr -d ' ')
+        if [ "$MAGIC" = "ed26ff3a" ]; then
+            ui_print "  -> Unsparsing super.img directly to block device..."
+            simg2img "$WORKDIR/super.img" "$SUPER_BLK" 2>/dev/null || \
+            dd if="$WORKDIR/super.img" of="$SUPER_BLK" bs=4M conv=fsync
+        else
+            ui_print "  -> Writing raw super.img directly to block device..."
+            dd if="$WORKDIR/super.img" of="$SUPER_BLK" bs=4M conv=fsync
         fi
-    done
+        rm -f "$WORKDIR/super.img"
+        ui_print "  -> Dynamic super partition flashing complete!"
+    else
+        ui_print "[WARN] super.img not in zip, checking for individual partition images..."
+        for p in system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering vendor odm; do
+            unzip -o "$ZIPFILE" "${p}.img" -d "$WORKDIR" >/dev/null 2>&1 || true
+            if [ -f "$WORKDIR/${p}.img" ]; then
+                P_DEV=$(find_block "$p")
+                [ -z "$P_DEV" ] && P_DEV=$(find /dev/block/mapper -name "$p" 2>/dev/null | head -n 1)
+                if [ -b "$P_DEV" ]; then
+                    ui_print "  -> Flashing $p..."
+                    dd if="$WORKDIR/${p}.img" of="$P_DEV" bs=4M conv=fsync 2>/dev/null || true
+                fi
+                rm -f "$WORKDIR/${p}.img"
+            fi
+        done
+    fi
 fi
 
 rm -rf "$WORKDIR"
 
 # Clean cache & stale runtime configs
-ui_print "- Cleaning stale caches and tombstones..."
+ui_print "- Cleaning stale caches, package cache & display settings..."
 rm -rf /data/dalvik-cache/* 2>/dev/null || true
 rm -rf /data/system/package_cache/* 2>/dev/null || true
 rm -rf /data/system/display_settings.xml 2>/dev/null || true
 rm -rf /data/tombstones/* 2>/dev/null || true
 rm -rf /cache/* 2>/dev/null || true
+
+sync
 
 ui_print " "
 ui_print "*****************************************************"
