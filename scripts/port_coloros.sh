@@ -78,8 +78,17 @@ done
 # If super.img is in base, unpack vendor and odm
 if [ -f "$BASE_EXTRACT/super.img" ]; then
     echo " -> Unpacking Samsung stock super.img..."
-    lpunpack "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || \
-    "$ROOT_DIR/bin/lpunpack" "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || true
+    export LD_LIBRARY_PATH="$ROOT_DIR/bin/lib64:${LD_LIBRARY_PATH:-}"
+    
+    # Samsung super.img is sparse, unsparse it first for lpunpack
+    if simg2img "$BASE_EXTRACT/super.img" "$BASE_EXTRACT/super_raw.img" 2>/dev/null; then
+        mv -f "$BASE_EXTRACT/super_raw.img" "$BASE_EXTRACT/super.img"
+    fi
+    
+    "$ROOT_DIR/bin/lpunpack" "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || \
+    lpunpack "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || true
+    
+    rm -f "$BASE_EXTRACT/super.img"
 fi
 
 # ------------------------------------------------------------------------------
@@ -120,11 +129,28 @@ if [ -f "$SYSTEM_IMG" ]; then
     fi
 fi
 
-# Pass other donor partitions directly to out_images to guarantee zero corruption
+# Pass other donor partitions directly to out_images (compress my_stock to fit M51 super size)
 for part in "${DONOR_PARTITIONS[@]}"; do
     [ "$part" = "system" ] && continue
     SRC_IMG="$DONOR_EXTRACT/${part}.img"
-    if [ -f "$SRC_IMG" ]; then
+    [ ! -f "$SRC_IMG" ] && continue
+    
+    if [ "$part" = "my_stock" ]; then
+        echo " -> Optimizing and compressing my_stock with LZ4HC..."
+        STOCK_DIR="$WORK_DIR/my_stock"
+        mkdir -p "$STOCK_DIR"
+        fsck.erofs --extract="$STOCK_DIR" "$SRC_IMG" 2>/dev/null || \
+        sudo mount -o loop,ro "$SRC_IMG" "$MNT_DIR" 2>/dev/null && cp -a "$MNT_DIR"/* "$STOCK_DIR/" 2>/dev/null && sudo umount "$MNT_DIR" 2>/dev/null || \
+        7z x "$SRC_IMG" -o"$STOCK_DIR" -y >/dev/null 2>&1 || true
+        
+        if [ "$(ls -A "$STOCK_DIR" 2>/dev/null)" ]; then
+            mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMAGES/my_stock.img" "$STOCK_DIR" 2>/dev/null || \
+            cp -f "$SRC_IMG" "$OUT_IMAGES/my_stock.img"
+            rm -rf "$STOCK_DIR"
+        else
+            cp -f "$SRC_IMG" "$OUT_IMAGES/my_stock.img"
+        fi
+    else
         echo " -> Retaining full donor partition: $part.img"
         cp -f "$SRC_IMG" "$OUT_IMAGES/${part}.img"
     fi
@@ -132,8 +158,21 @@ done
 
 # Copy Vendor, ODM and Kernel from Base
 if [ -f "$BASE_EXTRACT/vendor.img" ]; then
-    echo " -> Copying Base vendor.img..."
-    cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
+    echo " -> Optimizing Base vendor.img as EROFS..."
+    VENDOR_DIR="$WORK_DIR/vendor"
+    mkdir -p "$VENDOR_DIR"
+    sudo mount -o loop,ro "$BASE_EXTRACT/vendor.img" "$MNT_DIR" 2>/dev/null && \
+    cp -a "$MNT_DIR"/* "$VENDOR_DIR/" 2>/dev/null && \
+    sudo umount "$MNT_DIR" 2>/dev/null || \
+    7z x "$BASE_EXTRACT/vendor.img" -o"$VENDOR_DIR" -y >/dev/null 2>&1 || true
+    
+    if [ "$(ls -A "$VENDOR_DIR" 2>/dev/null)" ]; then
+        mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMAGES/vendor.img" "$VENDOR_DIR" 2>/dev/null || \
+        cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
+        rm -rf "$VENDOR_DIR"
+    else
+        cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
+    fi
 fi
 if [ -f "$BASE_EXTRACT/odm.img" ]; then
     echo " -> Copying Base odm.img..."
