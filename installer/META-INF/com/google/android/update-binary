@@ -20,8 +20,10 @@ DEVICE=$(getprop ro.product.device)
 MODEL=$(getprop ro.product.model)
 ui_print "- Current device: $DEVICE ($MODEL)"
 
-ui_print "- Extracting ROM components..."
-WORKDIR="/tmp/coloros_install"
+ui_print "- Extracting ROM components (using internal storage)..."
+WORKDIR="/data/local/tmp/coloros_install"
+mkdir -p "$WORKDIR" 2>/dev/null || WORKDIR="/sdcard/coloros_install"
+mkdir -p "$WORKDIR" 2>/dev/null || WORKDIR="/tmp/coloros_install"
 mkdir -p "$WORKDIR"
 unzip -o "$ZIPFILE" -d "$WORKDIR"
 
