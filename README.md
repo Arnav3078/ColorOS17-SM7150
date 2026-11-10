@@ -43,8 +43,6 @@ Any form of contribution, suggestions, bug report or feature request for the pro
 - VoLTE is not supported due to proprietary Samsung RIL limitations on cross-OEM ports
 
 ### Port-exclusive features:
-- Automated GitHub Actions build workflow (no local compilation)
-- FastbootD and Recovery (TWRP / OrangeFox) flashable zip generation
 - KernelSU / Next-KernelSU root integration support
 - HWUI and SurfaceFlinger rendering optimizations for zero-lag gesture flings
 
