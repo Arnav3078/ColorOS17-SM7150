@@ -207,6 +207,12 @@ if [ -f "$BASE_EXTRACT/vendor.img" ]; then
         
         sudo umount "$MNT_DIR"
     fi
+    
+    # Shrink vendor.img to minimal filesystem size (frees ~450MB empty padding so super.img fits inside 8GB limit)
+    echo "   * Shrinking vendor.img to minimal filesystem size with resize2fs..."
+    sudo e2fsck -f -y "$BASE_EXTRACT/vendor.img" 2>/dev/null || true
+    sudo resize2fs -M "$BASE_EXTRACT/vendor.img" 2>/dev/null || true
+    
     cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
 fi
 if [ -f "$BASE_EXTRACT/odm.img" ]; then
