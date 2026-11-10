@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/Arnav3078/ColorOS17-SM7150/discussions">🚀 Discussions</a>
   •
-  <a href="https://t.me/sm7150">💬 Telegram</a>
+  <a href="https://t.me/SammyM51Mods">💬 Telegram</a>
 </p>
 
 # What is ColorOS for SM7150?
