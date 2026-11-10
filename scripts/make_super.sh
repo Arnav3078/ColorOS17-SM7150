@@ -9,7 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 OUT_IMAGES="$ROOT_DIR/build/out_images"
 OUT_DIR="$ROOT_DIR/out"
-LPMAKE="$ROOT_DIR/bin/lpmake"`nexport LD_LIBRARY_PATH="$ROOT_DIR/bin/lib64:${LD_LIBRARY_PATH:-}"
+LPMAKE="$ROOT_DIR/bin/lpmake"
+export LD_LIBRARY_PATH="$ROOT_DIR/bin/lib64:${LD_LIBRARY_PATH:-}"
 INSTALLER_DIR="$ROOT_DIR/installer"
 
 [ ! -x "$LPMAKE" ] && LPMAKE="lpmake"
@@ -34,6 +35,7 @@ LPMAKE_ARGS=(
 )
 
 echo "[INFO] Scanning output images for lpmake..."
+TOTAL_PART_SIZE=0
 for img in "$OUT_IMAGES"/*.img; do
     [ ! -f "$img" ] && continue
     part_name=$(basename "$img" .img)
@@ -44,17 +46,24 @@ for img in "$OUT_IMAGES"/*.img; do
     fi
     
     img_size=$(stat -c%s "$img")
+    TOTAL_PART_SIZE=$((TOTAL_PART_SIZE + img_size))
     echo " -> Adding partition to super: $part_name (size: $img_size bytes)"
     LPMAKE_ARGS+=(--partition "${part_name}:readonly:${img_size}:${GROUP_NAME}" --image "${part_name}=${img}")
 done
 
-LPMAKE_ARGS+=(--sparse --output "$OUT_IMAGES/super.img")
+echo "[INFO] Total super partition data size: $TOTAL_PART_SIZE bytes (Max Group: $GROUP_SIZE)"
 
-echo "[INFO] Executing lpmake..."
-if "$LPMAKE" "${LPMAKE_ARGS[@]}"; then
-    echo "[SUCCESS] Dynamic super.img built successfully!"
+# If total size fits in super partition, run lpmake
+if [ "$TOTAL_PART_SIZE" -le "$GROUP_SIZE" ]; then
+    LPMAKE_ARGS+=(--sparse --output "$OUT_IMAGES/super.img")
+    echo "[INFO] Executing lpmake..."
+    if "$LPMAKE" "${LPMAKE_ARGS[@]}"; then
+        echo "[SUCCESS] Dynamic super.img built successfully!"
+    else
+        echo "[WARN] lpmake failed, packaging individual sparse images..."
+    fi
 else
-    echo "[WARN] lpmake failed or not available, keeping raw images for sparse packaging..."
+    echo "[WARN] Partition contents exceed physical super partition size ($TOTAL_PART_SIZE > $GROUP_SIZE). Packaging dynamic partitions for sparse flashing..."
 fi
 
 # ------------------------------------------------------------------------------
@@ -76,10 +85,11 @@ cp -f "$INSTALLER_DIR/flash_all.sh" "$ZIP_TEMP/"
 # Copy firmware / boot images
 [ -f "$OUT_IMAGES/boot.img" ] && cp -f "$OUT_IMAGES/boot.img" "$ZIP_TEMP/boot.img"
 [ -f "$OUT_IMAGES/dtbo.img" ] && cp -f "$OUT_IMAGES/dtbo.img" "$ZIP_TEMP/dtbo.img"
-[ -f "$OUT_IMAGES/super.img" ] && cp -f "$OUT_IMAGES/super.img" "$ZIP_TEMP/super.img"
 
-# If super.img was not generated, copy individual partition images
-if [ ! -f "$ZIP_TEMP/super.img" ]; then
+if [ -f "$OUT_IMAGES/super.img" ]; then
+    cp -f "$OUT_IMAGES/super.img" "$ZIP_TEMP/super.img"
+else
+    echo "[INFO] Copying individual partition images into zip..."
     cp -f "$OUT_IMAGES"/*.img "$ZIP_TEMP/"
 fi
 

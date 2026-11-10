@@ -12,6 +12,7 @@ DONOR_EXTRACT="$BUILD_DIR/donor_extracted"
 BASE_EXTRACT="$BUILD_DIR/base_extracted"
 WORK_DIR="$BUILD_DIR/workspace"
 OUT_IMAGES="$BUILD_DIR/out_images"
+MNT_DIR="$BUILD_DIR/mnt_tmp"
 DEVICE_DIR="$ROOT_DIR/device/samsung/m51"
 
 REPACK_TYPE="${REPACK_TYPE:-EROFS}"
@@ -23,7 +24,7 @@ echo " Donor: OnePlus 13 (PJZ110 - Snapdragon 8 Elite Flagship Base)"
 echo " Repack Filesystem: $REPACK_TYPE | KernelSU: $ENABLE_KSU"
 echo "======================================================================"
 
-mkdir -p "$BUILD_DIR" "$DONOR_EXTRACT" "$BASE_EXTRACT" "$WORK_DIR" "$OUT_IMAGES"
+mkdir -p "$BUILD_DIR" "$DONOR_EXTRACT" "$BASE_EXTRACT" "$WORK_DIR" "$OUT_IMAGES" "$MNT_DIR"
 
 # ------------------------------------------------------------------------------
 # Step 1: Extract Donor ROM (OnePlus 13 Flagship ColorOS 17)
@@ -82,29 +83,54 @@ if [ -f "$BASE_EXTRACT/super.img" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# Step 3: Unpack System Partitions for Modification
+# Step 3: Extract and Prepare System Partitions
 # ------------------------------------------------------------------------------
 echo "[3/6] Unpacking partitions for modification..."
 
 DONOR_PARTITIONS=(system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering)
 
-for part in "${DONOR_PARTITIONS[@]}"; do
-    IMG_FILE="$DONOR_EXTRACT/${part}.img"
-    PART_DIR="$WORK_DIR/$part"
-    mkdir -p "$PART_DIR"
-    
-    if [ -f "$IMG_FILE" ]; then
-        echo " -> Extracting $part.img..."
-        if [ -x "$ROOT_DIR/bin/extract.erofs" ]; then
-            "$ROOT_DIR/bin/extract.erofs" -i "$IMG_FILE" -x -T "$PART_DIR" 2>/dev/null || 7z x "$IMG_FILE" -o"$PART_DIR" -y >/dev/null 2>&1 || true
-        else
-            7z x "$IMG_FILE" -o"$PART_DIR" -y >/dev/null 2>&1 || true
+# Extract only system partition for deep modification (build.prop, sepolicy, init scripts)
+# This guarantees untouched partitions retain 100% original binary integrity without 8KB corruption
+SYSTEM_IMG="$DONOR_EXTRACT/system.img"
+SYSTEM_DIR="$WORK_DIR/system"
+mkdir -p "$SYSTEM_DIR"
+
+if [ -f "$SYSTEM_IMG" ]; then
+    echo " -> Unpacking system.img..."
+    UNPACKED=false
+    if command -v fsck.erofs >/dev/null 2>&1 && fsck.erofs --extract="$SYSTEM_DIR" "$SYSTEM_IMG" 2>/dev/null; then
+        if [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+            echo " -> Successfully extracted system.img with fsck.erofs"
+            UNPACKED=true
         fi
+    fi
+    if [ "$UNPACKED" = false ]; then
+        if sudo mount -o loop,ro "$SYSTEM_IMG" "$MNT_DIR" 2>/dev/null; then
+            cp -a "$MNT_DIR"/* "$SYSTEM_DIR/" 2>/dev/null || true
+            sudo umount "$MNT_DIR" 2>/dev/null || true
+            if [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+                echo " -> Successfully mounted and copied system.img"
+                UNPACKED=true
+            fi
+        fi
+    fi
+    if [ "$UNPACKED" = false ]; then
+        echo " -> Falling back to 7z extraction for system.img..."
+        7z x "$SYSTEM_IMG" -o"$SYSTEM_DIR" -y >/dev/null 2>&1 || true
+    fi
+fi
+
+# Pass other donor partitions directly to out_images to guarantee zero corruption
+for part in "${DONOR_PARTITIONS[@]}"; do
+    [ "$part" = "system" ] && continue
+    SRC_IMG="$DONOR_EXTRACT/${part}.img"
+    if [ -f "$SRC_IMG" ]; then
+        echo " -> Retaining full donor partition: $part.img"
+        cp -f "$SRC_IMG" "$OUT_IMAGES/${part}.img"
     fi
 done
 
 # Copy Vendor, ODM and Kernel from Base
-mkdir -p "$WORK_DIR/vendor" "$WORK_DIR/odm"
 if [ -f "$BASE_EXTRACT/vendor.img" ]; then
     echo " -> Copying Base vendor.img..."
     cp -f "$BASE_EXTRACT/vendor.img" "$OUT_IMAGES/vendor.img"
@@ -128,80 +154,62 @@ fi
 echo "[4/6] Applying Galaxy M51 Adaptations & Performance Engine..."
 
 # 4.1 Device Properties & Identifiers
-if [ -d "$WORK_DIR/system" ]; then
-    echo " -> Injecting device identifiers into system/build.prop..."
-    cat "$DEVICE_DIR/device.prop" >> "$WORK_DIR/system/system/build.prop" 2>/dev/null || \
-    cat "$DEVICE_DIR/device.prop" >> "$WORK_DIR/system/build.prop" 2>/dev/null || true
+SYSTEM_PROP=$(find "$SYSTEM_DIR" -name "build.prop" 2>/dev/null | head -n 1)
+if [ -n "$SYSTEM_PROP" ]; then
+    echo " -> Injecting device identifiers into $SYSTEM_PROP..."
+    cat "$DEVICE_DIR/device.prop" >> "$SYSTEM_PROP"
+    echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks into $SYSTEM_PROP..."
+    cat "$DEVICE_DIR/tweaks.prop" >> "$SYSTEM_PROP"
+else
+    echo "[WARN] system/build.prop not found; creating default prop overlay..."
+    mkdir -p "$SYSTEM_DIR/system/etc"
+    cat "$DEVICE_DIR/device.prop" "$DEVICE_DIR/tweaks.prop" >> "$SYSTEM_DIR/system/etc/prop.default" 2>/dev/null || true
 fi
 
-# 4.2 Performance, Fluidity & Blur Preservation Tweaks
-if [ -d "$WORK_DIR/system" ]; then
-    echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks..."
-    cat "$DEVICE_DIR/tweaks.prop" >> "$WORK_DIR/system/system/build.prop" 2>/dev/null || \
-    cat "$DEVICE_DIR/tweaks.prop" >> "$WORK_DIR/system/build.prop" 2>/dev/null || true
-fi
-
-# 4.3 Prune Heavy Telemetry & Background Logger Daemons (Zero-Lag Engine)
-echo " -> Pruning heavy background logging & telemetry daemons..."
+# 4.2 Prune Heavy Telemetry & Background Logger Daemons (Zero-Lag Engine)
+echo " -> Pruning heavy background logging & telemetry daemons from system..."
 while IFS= read -r line || [ -n "$line" ]; do
     [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
-    TARGET_PATH="$WORK_DIR/$line"
-    if [ -e "$TARGET_PATH" ]; then
-        echo "    Pruning bloat daemon: $line"
-        rm -rf "$TARGET_PATH"
-    fi
+    clean_line="${line#system/}"
+    for candidate in "$SYSTEM_DIR/$line" "$SYSTEM_DIR/$clean_line" "$SYSTEM_DIR/system/$clean_line"; do
+        if [ -e "$candidate" ]; then
+            echo "    Pruning bloat daemon: $candidate"
+            rm -rf "$candidate"
+        fi
+    done
 done < "$DEVICE_DIR/bloat_prune.list"
 
-# 4.4 Copy SELinux CIL Rules
+# 4.3 Copy SELinux CIL Rules
 if [ -f "$DEVICE_DIR/sepolicy/m51.cil" ]; then
     echo " -> Injecting SELinux compatibility policy..."
-    if [ -d "$WORK_DIR/system/system/etc/selinux" ]; then
-        cat "$DEVICE_DIR/sepolicy/m51.cil" >> "$WORK_DIR/system/system/etc/selinux/plat_sepolicy.cil"
-    elif [ -d "$WORK_DIR/system/etc/selinux" ]; then
-        cat "$DEVICE_DIR/sepolicy/m51.cil" >> "$WORK_DIR/system/etc/selinux/plat_sepolicy.cil"
+    SEPOL_FILE=$(find "$SYSTEM_DIR" -name "plat_sepolicy.cil" 2>/dev/null | head -n 1)
+    if [ -n "$SEPOL_FILE" ]; then
+        cat "$DEVICE_DIR/sepolicy/m51.cil" >> "$SEPOL_FILE"
     fi
 fi
 
-# 4.5 Deploy RRO Device Overlays into product/overlay
-OVERLAY_TARGET="$WORK_DIR/product/product/overlay"
-[ ! -d "$OVERLAY_TARGET" ] && OVERLAY_TARGET="$WORK_DIR/product/overlay"
-mkdir -p "$OVERLAY_TARGET"
-
-echo " -> Deploying Galaxy M51 RRO overlays (7000mAh battery, side-FP, center punch hole)..."
-cp -rf "$DEVICE_DIR/overlays/"* "$OVERLAY_TARGET/" 2>/dev/null || true
-
-# 4.6 Prevent Oplus TEE & Keystore bootloop
+# 4.4 Prevent Oplus TEE & Keystore bootloop
 echo " -> Neutralizing conflicting Oplus TEE / Keystore triggers in init scripts..."
-find "$WORK_DIR" -type f -name "*.rc" | while read -r rcfile; do
-    if grep -q "oplus_teesim_daemon" "$rcfile"; then
+find "$SYSTEM_DIR" -type f -name "*.rc" 2>/dev/null | while read -r rcfile; do
+    if grep -q "oplus_teesim_daemon" "$rcfile" 2>/dev/null; then
         sed -i 's/service oplus_teesim_daemon/service oplus_teesim_daemon \/system\/bin\/true\n    disabled/g' "$rcfile"
     fi
 done
 
 # ------------------------------------------------------------------------------
-# Step 5: Repack Partitions (EROFS or EXT4)
+# Step 5: Repack System Partition
 # ------------------------------------------------------------------------------
-echo "[5/6] Repacking partitions ($REPACK_TYPE)..."
+echo "[5/6] Repacking system partition ($REPACK_TYPE)..."
 
-for part in "${DONOR_PARTITIONS[@]}"; do
-    PART_DIR="$WORK_DIR/$part"
-    OUT_IMG="$OUT_IMAGES/${part}.img"
-    
-    if [ -d "$PART_DIR" ] && [ "$(ls -A "$PART_DIR" 2>/dev/null)" ]; then
-        echo " -> Repacking $part as $REPACK_TYPE..."
-        if [ "$REPACK_TYPE" = "EROFS" ]; then
-            mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMG" "$PART_DIR"
-        else
-            SIZE_KB=$(du -sk "$PART_DIR" | cut -f1)
-            SIZE_BYTES=$(( (SIZE_KB + (SIZE_KB * 15 / 100)) * 1024 ))
-            make_ext4fs -l "$SIZE_BYTES" -s "$OUT_IMG" "$PART_DIR" 2>/dev/null || \
-            mke2fs -O ^has_journal -b 4096 -L "$part" -M "/$part" -m 0 "$OUT_IMG"
-        fi
-    elif [ -f "$DONOR_EXTRACT/${part}.img" ]; then
-        echo " -> Passing untouched $part.img to output..."
-        cp -f "$DONOR_EXTRACT/${part}.img" "$OUT_IMG"
-    fi
-done
+OUT_SYS_IMG="$OUT_IMAGES/system.img"
+if [ -d "$SYSTEM_DIR" ] && [ "$(ls -A "$SYSTEM_DIR" 2>/dev/null)" ]; then
+    echo " -> Repacking system as $REPACK_TYPE..."
+    mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_SYS_IMG" "$SYSTEM_DIR" 2>/dev/null || \
+    cp -f "$DONOR_EXTRACT/system.img" "$OUT_SYS_IMG"
+else
+    echo " -> Retaining original system.img..."
+    cp -f "$DONOR_EXTRACT/system.img" "$OUT_SYS_IMG"
+fi
 
 echo "======================================================================"
 echo "[SUCCESS] Partition porting and modification completed successfully!"

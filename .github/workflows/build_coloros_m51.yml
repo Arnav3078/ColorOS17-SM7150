@@ -129,6 +129,7 @@ jobs:
 
       - name: Upload to GoFile
         if: ${{ inputs.upload_gofile }}
+        continue-on-error: true
         run: |
           ROM_ZIP=$(find out/ -name "ColorOS17_M51_*.zip" | head -n 1)
           if [[ -n "$ROM_ZIP" && -f "$ROM_ZIP" ]]; then
