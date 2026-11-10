@@ -144,6 +144,8 @@ for part in "${DONOR_PARTITIONS[@]}"; do
         7z x "$SRC_IMG" -o"$STOCK_DIR" -y >/dev/null 2>&1 || true
         
         if [ "$(ls -A "$STOCK_DIR" 2>/dev/null)" ]; then
+            # Prune non-essential preloaded carrier demo packages to fit M51 super partition
+            rm -rf "$STOCK_DIR/del-app" "$STOCK_DIR/non_overlay" 2>/dev/null || true
             mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMAGES/my_stock.img" "$STOCK_DIR" 2>/dev/null || \
             cp -f "$SRC_IMG" "$OUT_IMAGES/my_stock.img"
             rm -rf "$STOCK_DIR"
