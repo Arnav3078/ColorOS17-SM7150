@@ -53,15 +53,32 @@ fi
 # Step 2: Extract Base Vendor & Kernel for Galaxy M51
 # ------------------------------------------------------------------------------
 echo "[2/6] Extracting Samsung Galaxy M51 Base Vendor & Kernel..."
+AP_ARCHIVE=$(find "$ROOT_DIR/input/base" -type f -name "AP_*.tar*" | head -n 1)
 BASE_ARCHIVE=$(find "$ROOT_DIR/input/base" -type f \( -name "*.tar*" -o -name "*.zip" -o -name "*.img" \) | head -n 1)
 
-if [ -n "$BASE_ARCHIVE" ]; then
+if [ -n "$AP_ARCHIVE" ]; then
+    echo "[INFO] Found Samsung AP package: $AP_ARCHIVE"
+    tar -xf "$AP_ARCHIVE" -C "$BASE_EXTRACT" 2>/dev/null || true
+elif [ -n "$BASE_ARCHIVE" ]; then
     echo "[INFO] Found base package: $BASE_ARCHIVE"
     tar -xf "$BASE_ARCHIVE" -C "$BASE_EXTRACT" 2>/dev/null || \
     7z x "$BASE_ARCHIVE" -o"$BASE_EXTRACT" -y || \
-    unzip -q "$BASE_ARCHIVE" -d "$BASE_EXTRACT" || true
-else
-    echo "[WARN] No base archive found, using fallback vendor tree structure..."
+    unzip -q -o "$BASE_ARCHIVE" -d "$BASE_EXTRACT" || true
+fi
+
+# Decompress Samsung .lz4 images if present
+for lz4file in "$BASE_EXTRACT"/*.lz4; do
+    [ ! -f "$lz4file" ] && continue
+    echo " -> Decompressing $(basename "$lz4file")..."
+    lz4 -d -f -q "$lz4file" "${lz4file%.lz4}"
+    rm -f "$lz4file"
+done
+
+# If super.img is in base, unpack vendor and odm
+if [ -f "$BASE_EXTRACT/super.img" ]; then
+    echo " -> Unpacking Samsung stock super.img..."
+    lpunpack "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || \
+    "$ROOT_DIR/bin/lpunpack" "$BASE_EXTRACT/super.img" "$BASE_EXTRACT" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------
@@ -86,7 +103,7 @@ for part in "${DONOR_PARTITIONS[@]}"; do
     fi
 done
 
-# Copy Vendor and Kernel from Base
+# Copy Vendor, ODM and Kernel from Base
 mkdir -p "$WORK_DIR/vendor" "$WORK_DIR/odm"
 if [ -f "$BASE_EXTRACT/vendor.img" ]; then
     echo " -> Copying Base vendor.img..."

@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       donor_url:
-        description: "ColorOS 17 Flagship Donor ROM URL (OnePlus 13 PJZ110 zip or payload.bin)"
+        description: "ColorOS 17 Flagship Donor ROM URL (Direct download link to OnePlus 13 PJZ110 zip / payload.bin)"
         required: true
-        default: "https://oxygenos.oneplus.net/OP13_PJZ110_ColorOS17_Official_Payload.zip"
+        default: ""
         type: string
       base_url:
-        description: "Galaxy M51 Base Vendor Firmware URL (SM7150 / SM-M515F vendor package)"
+        description: "Galaxy M51 Base Vendor: Direct URL or 'auto' to download official M51 stock firmware"
         required: true
-        default: "https://github.com/Arnav3078/UN1CA-SM7150/releases/download/v1.0/m51_base_vendor.tar.xz"
+        default: "auto"
         type: string
       repack_type:
         description: "Filesystem Type for Repacked Partitions (EROFS or EXT4)"
@@ -63,34 +63,57 @@ jobs:
         run: |
           sudo apt-get update -y
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends \
-            aria2 brotli curl dos2unix e2fsprogs erofs-utils f2fs-tools \
+            android-sdk-libsparse-utils aria2 brotli curl dos2unix e2fsprogs erofs-utils f2fs-tools \
             gawk git libbrotli-dev liblz4-tool libprotobuf-dev \
             lz4 openjdk-17-jre-headless p7zip-full python3 python3-pip \
-            python3-protobuf tar simg2img img2simg unzip wget xz-utils zstd
+            python3-protobuf tar unzip wget xz-utils zstd
           
           # Setup payload-dumper-go
           curl -sSL https://github.com/ssut/payload-dumper-go/releases/download/1.2.2/payload-dumper-go_1.2.2_linux_amd64.tar.gz | tar -xz -C /usr/local/bin payload-dumper-go
           sudo chmod +x /usr/local/bin/payload-dumper-go
 
+          # Setup samloader-rs for official Samsung base downloads
+          curl -sSLf "https://github.com/topjohnwu/samloader-rs/releases/download/2.0.0/samloader-v2.0.0-linux-x86_64.tar.xz" | tar -xJ -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/samloader
+
       - name: Setup Porting Toolchain & OTA Utilities
         run: |
           chmod +x scripts/*.sh
           ./scripts/setup_tools.sh
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
 
       - name: Download Base & Donor ROMs
         run: |
           mkdir -p input/donor input/base
-          
-          echo "Downloading OnePlus 13 (PJZ110) ColorOS 17 Flagship Donor ROM..."
-          if [[ "${{ inputs.donor_url }}" =~ ^https?:// ]]; then
-            aria2c -x 16 -s 16 -j 4 --continue=true --out="donor_rom.zip" "${{ inputs.donor_url }}" -d input/donor || \
-            wget -c -O input/donor/donor_rom.zip "${{ inputs.donor_url }}"
+
+          # 1. Download Donor Firmware (OnePlus 13 PJZ110)
+          DONOR_URL="${{ inputs.donor_url }}"
+          if [[ -n "$DONOR_URL" && "$DONOR_URL" =~ ^https?:// ]]; then
+            echo "Downloading OnePlus 13 (PJZ110) ColorOS 17 Flagship Donor from: $DONOR_URL"
+            aria2c -x 16 -s 16 -j 4 --continue=true --out="donor_rom.zip" "$DONOR_URL" -d input/donor || \
+            wget -c -O input/donor/donor_rom.zip "$DONOR_URL"
+          else
+            echo "[ERROR] Please provide a valid direct download link to OnePlus 13 ColorOS 17 firmware/payload.bin in donor_url!"
+            echo "You can host or mirror your payload.bin or firmware zip on GoFile, PixelDrain, or Google Drive (direct link)."
+            exit 1
           fi
 
-          echo "Downloading Galaxy M51 Base Vendor Package..."
-          if [[ "${{ inputs.base_url }}" =~ ^https?:// ]]; then
-            aria2c -x 16 -s 16 -j 4 --continue=true --out="base_vendor.tar.xz" "${{ inputs.base_url }}" -d input/base || \
-            wget -c -O input/base/base_vendor.tar.xz "${{ inputs.base_url }}"
+          # 2. Download Samsung Galaxy M51 Base Vendor Firmware
+          BASE_INPUT="${{ inputs.base_url }}"
+          if [[ "$BASE_INPUT" == "auto" || "$BASE_INPUT" == "" ]]; then
+            echo "Fetching latest official Samsung Galaxy M51 (SM-M515F) base firmware via samloader..."
+            mkdir -p input/base/odin
+            samloader download --model SM-M515F --region INS -o input/base/odin/
+            FW_ZIP=$(find input/base/odin/ -type f -name "*.zip" | head -n 1)
+            if [ -n "$FW_ZIP" ]; then
+              echo "Extracting Samsung base package..."
+              unzip -q -o "$FW_ZIP" -d input/base/
+              rm -f "$FW_ZIP"
+            fi
+          elif [[ "$BASE_INPUT" =~ ^https?:// ]]; then
+            echo "Downloading M51 Base Vendor from URL: $BASE_INPUT"
+            aria2c -x 16 -s 16 -j 4 --continue=true --out="base_vendor.tar.xz" "$BASE_INPUT" -d input/base || \
+            wget -c -O input/base/base_vendor.tar.xz "$BASE_INPUT"
           fi
 
       - name: Execute Automated Porting Engine

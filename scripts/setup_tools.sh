@@ -10,40 +10,19 @@ cd "$TOOLS_DIR"
 
 echo "[INFO] Setting up porting tools in $TOOLS_DIR..."
 
-# Download Android OTA & dynamic partition tools if missing
+# Download Android dynamic partition tools (lpmake, lpunpack)
 if [ ! -f "lpmake" ] || [ ! -f "lpunpack" ]; then
     echo "[INFO] Downloading lpmake and lpunpack..."
-    curl -sSL "https://raw.githubusercontent.com/unix3dgamer/lpmake-prebuilt/main/lpmake" -o lpmake || \
-    curl -sSL "https://github.com/affggh/lpmake-bin/raw/master/lpmake" -o lpmake
-    curl -sSL "https://raw.githubusercontent.com/unix3dgamer/lpmake-prebuilt/main/lpunpack" -o lpunpack || \
-    curl -sSL "https://github.com/affggh/lpmake-bin/raw/master/lpunpack" -o lpunpack
+    curl -sSL "https://raw.githubusercontent.com/toraidl/coloros_port/COS17/otatools/bin/lpmake" -o lpmake
+    curl -sSL "https://raw.githubusercontent.com/toraidl/coloros_port/COS17/otatools/bin/lpunpack" -o lpunpack
     chmod +x lpmake lpunpack
 fi
 
-# Download apktool
-if [ ! -f "apktool.jar" ]; then
-    echo "[INFO] Downloading apktool.jar..."
-    curl -sSL "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar" -o apktool.jar
-fi
-
-# Download baksmali and smali
-if [ ! -f "baksmali.jar" ] || [ ! -f "smali.jar" ]; then
-    echo "[INFO] Downloading smali & baksmali..."
-    curl -sSL "https://bitbucket.org/JesusFreke/smali/downloads/baksmali-2.5.2.jar" -o baksmali.jar
-    curl -sSL "https://bitbucket.org/JesusFreke/smali/downloads/smali-2.5.2.jar" -o smali.jar
-fi
-
-# Download signapk
-if [ ! -f "signapk.jar" ]; then
-    echo "[INFO] Downloading signapk..."
-    curl -sSL "https://raw.githubusercontent.com/appium-bup/sign/master/dist/signapk.jar" -o signapk.jar
-fi
-
-# Download extract-erofs helper
+# Download extract.erofs helper
 if [ ! -f "extract.erofs" ]; then
     echo "[INFO] Downloading extract.erofs..."
-    curl -sSL "https://github.com/sekaiacg/erofs-utils/releases/download/v1.7.1/extract.erofs_linux_x86_64" -o extract.erofs || true
-    chmod +x extract.erofs || true
+    curl -sSL "https://raw.githubusercontent.com/toraidl/coloros_port/COS17/bin/Linux/x86_64/extract.erofs" -o extract.erofs
+    chmod +x extract.erofs
 fi
 
 echo "[INFO] Toolchain setup complete."
