@@ -103,7 +103,7 @@ jobs:
           if [[ "$BASE_INPUT" == "auto" || "$BASE_INPUT" == "" ]]; then
             echo "Fetching latest official Samsung Galaxy M51 (SM-M515F) base firmware via samloader..."
             mkdir -p input/base/odin
-            samloader download --model SM-M515F --region INS -o input/base/odin/
+            ( cd input/base/odin && samloader download --model SM-M515F --region INS )
             FW_ZIP=$(find input/base/odin/ -type f -name "*.zip" | head -n 1)
             if [ -n "$FW_ZIP" ]; then
               echo "Extracting Samsung base package..."
