@@ -21,10 +21,10 @@ echo "======================================================================"
 echo "[6/6] Generating Dynamic super.img and Assembling Flashable ZIP"
 echo "======================================================================"
 
-# Samsung Galaxy M51 Super Partition Spec (Approx 5.5GB / 5767168000 bytes)
-SUPER_SIZE=5767168000
+# Samsung Galaxy M51 Super Partition Spec (Matching UN1CA-SM7150 8GB dynamic partition table)
+SUPER_SIZE=8053063680
 GROUP_NAME="qti_dynamic_partitions"
-GROUP_SIZE=5762973696
+GROUP_SIZE=8048869376
 
 LPMAKE_ARGS=(
     --metadata-size 65536

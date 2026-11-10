@@ -26,13 +26,8 @@ on:
         required: false
         default: true
         type: boolean
-      release_rom:
-        description: "Create GitHub Release with Flashable ROM"
-        required: false
-        default: true
-        type: boolean
-      upload_gofile:
-        description: "Upload ROM to GoFile (Direct Download Link)"
+      upload_mirrors:
+        description: "Upload ROM to Fast Mirrors (PixelDrain / GoFile)"
         required: false
         default: true
         type: boolean
@@ -127,43 +122,36 @@ jobs:
         run: |
           ./scripts/make_super.sh
 
-      - name: Upload to GoFile
-        if: ${{ inputs.upload_gofile }}
+      - name: Upload Flashable ROM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ColorOS17-M51-Flashable-ROM
+          path: |
+            out/ColorOS17_M51_*.zip
+            out/ColorOS17_M51_*.md5
+            out/ColorOS17_M51_*.sha256
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload ROM to Mirrors (PixelDrain & GoFile)
+        if: ${{ inputs.upload_mirrors }}
         continue-on-error: true
         run: |
           ROM_ZIP=$(find out/ -name "ColorOS17_M51_*.zip" | head -n 1)
           if [[ -n "$ROM_ZIP" && -f "$ROM_ZIP" ]]; then
-            echo "Uploading $ROM_ZIP to GoFile..."
-            SERVER=$(curl -s https://api.gofile.io/getServer | grep -oP '(?<="server":")[^"]+')
-            if [[ -n "$SERVER" ]]; then
-              UPLOAD_RESULT=$(curl -F "file=@$ROM_ZIP" "https://${SERVER}.gofile.io/uploadFile")
-              DOWNLOAD_PAGE=$(echo "$UPLOAD_RESULT" | grep -oP '(?<="downloadPage":")[^"]+')
-              echo "DOWNLOAD_PAGE=$DOWNLOAD_PAGE" >> "$GITHUB_ENV"
-              echo "### 🚀 Direct Download Link (GoFile): $DOWNLOAD_PAGE" >> $GITHUB_STEP_SUMMARY
+            echo "=== Uploading $ROM_ZIP to PixelDrain ==="
+            PD_RES=$(curl -s -F "file=@$ROM_ZIP" https://pixeldrain.com/api/file/ || true)
+            PD_ID=$(echo "$PD_RES" | grep -oP '(?<="id":")[^"]+' || true)
+            if [ -n "$PD_ID" ]; then
+              echo "### 🚀 PixelDrain Mirror: https://pixeldrain.com/u/$PD_ID" >> $GITHUB_STEP_SUMMARY
+              echo "[SUCCESS] PixelDrain Link: https://pixeldrain.com/u/$PD_ID"
+            fi
+
+            echo "=== Uploading $ROM_ZIP to GoFile ==="
+            GF_RES=$(curl -s -F "file=@$ROM_ZIP" https://upload.gofile.io/uploadFile || true)
+            GF_PAGE=$(echo "$GF_RES" | grep -oP '(?<="downloadPage":")[^"]+' || true)
+            if [ -n "$GF_PAGE" ]; then
+              echo "### ⚡ GoFile Mirror: $GF_PAGE" >> $GITHUB_STEP_SUMMARY
+              echo "[SUCCESS] GoFile Link: $GF_PAGE"
             fi
           fi
-
-      - name: Create GitHub Release
-        if: ${{ inputs.release_rom }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0-ColorOS17-M51-${{ github.run_number }}
-          name: "ColorOS 17 OnePlus 13 Flagship Port for Galaxy M51 (Build #${{ github.run_number }})"
-          body: |
-            ## ColorOS 17 Flagship Port for Samsung Galaxy M51 (`m51` / `sm7150`)
-            
-            ### 🌟 Features:
-            - **Base**: OnePlus 13 (`PJZ110`) Snapdragon 8 Elite Flagship ColorOS 17.
-            - **Animations**: 100% Full Flagship Parallel Processing 2.0 Animation Engine, Tidal Engine, Gaussian Blur, Fluid Cloud / Aqua Dynamics, and Lockscreen Depth Effects.
-            - **Optimization**: Zero-Lag tuning for Snapdragon 730G — telemetry, heavy profiling daemons, and background bloat stripped without touching animations.
-            - **Hardware**: Complete HAL mapping for AMOLED 60Hz display, 7000mAh battery curve, side capacitive fingerprint sensor, sensors, audio, and camera.
-            - **Known Issues**: VoLTE not working (standard LTE mobile data, SMS, Wi-Fi, BT fully working).
-            
-            ${{ env.DOWNLOAD_PAGE && format('**Direct Download (GoFile)**: {0}', env.DOWNLOAD_PAGE) || '' }}
-          files: |
-            out/ColorOS17_M51_*.zip
-            out/ColorOS17_M51_*.md5
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
