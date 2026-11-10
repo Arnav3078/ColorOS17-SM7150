@@ -20,33 +20,39 @@ DEVICE=$(getprop ro.product.device)
 MODEL=$(getprop ro.product.model)
 ui_print "- Current device: $DEVICE ($MODEL)"
 
-ui_print "- Extracting ROM components (using internal storage)..."
+ui_print "- Extracting ROM components to storage..."
 WORKDIR="/data/local/tmp/coloros_install"
 mkdir -p "$WORKDIR" 2>/dev/null || WORKDIR="/sdcard/coloros_install"
 mkdir -p "$WORKDIR" 2>/dev/null || WORKDIR="/tmp/coloros_install"
 mkdir -p "$WORKDIR"
-unzip -o "$ZIPFILE" -d "$WORKDIR"
 
 # Flashing boot
+ui_print "- Extracting & Flashing Boot Image (Kernel & KSU)..."
+unzip -o "$ZIPFILE" boot.img -d "$WORKDIR" >/dev/null 2>&1 || true
 if [ -f "$WORKDIR/boot.img" ]; then
-    ui_print "- Flashing Boot Image (Kernel & KSU)..."
-    dd if="$WORKDIR/boot.img" of=/dev/block/bootdevice/by-name/boot
+    dd if="$WORKDIR/boot.img" of=/dev/block/bootdevice/by-name/boot bs=4M
+    rm -f "$WORKDIR/boot.img"
 fi
 
 # Flashing dtbo
+ui_print "- Extracting & Flashing Device Tree Overlay (DTBO)..."
+unzip -o "$ZIPFILE" dtbo.img -d "$WORKDIR" >/dev/null 2>&1 || true
 if [ -f "$WORKDIR/dtbo.img" ]; then
-    ui_print "- Flashing Device Tree Overlay (DTBO)..."
-    dd if="$WORKDIR/dtbo.img" of=/dev/block/bootdevice/by-name/dtbo
+    dd if="$WORKDIR/dtbo.img" of=/dev/block/bootdevice/by-name/dtbo bs=4M
+    rm -f "$WORKDIR/dtbo.img"
 fi
 
 # Flashing dynamic partitions
+ui_print "- Extracting & Flashing Dynamic Super Partition (may take a few minutes)..."
+unzip -o "$ZIPFILE" super.img -d "$WORKDIR" >/dev/null 2>&1 || true
 if [ -f "$WORKDIR/super.img" ]; then
-    ui_print "- Flashing Dynamic Super Partition..."
     simg2img "$WORKDIR/super.img" /dev/block/bootdevice/by-name/super 2>/dev/null || \
     dd if="$WORKDIR/super.img" of=/dev/block/bootdevice/by-name/super bs=4M
+    rm -f "$WORKDIR/super.img"
 else
     ui_print "- Flashing individual dynamic partitions..."
     for p in system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering vendor odm; do
+        unzip -o "$ZIPFILE" "${p}.img" -d "$WORKDIR" >/dev/null 2>&1 || true
         if [ -f "$WORKDIR/${p}.img" ]; then
             BLOCK_DEV=$(find /dev/block/mapper -name "$p" 2>/dev/null | head -n 1)
             [ -z "$BLOCK_DEV" ] && BLOCK_DEV="/dev/block/by-name/$p"
@@ -54,6 +60,7 @@ else
                 ui_print "  -> Flashing $p..."
                 dd if="$WORKDIR/${p}.img" of="$BLOCK_DEV" bs=4M 2>/dev/null || true
             fi
+            rm -f "$WORKDIR/${p}.img"
         fi
     done
 fi
