@@ -170,6 +170,14 @@ mkdir -p "$OVERLAY_TARGET"
 echo " -> Deploying Galaxy M51 RRO overlays (7000mAh battery, side-FP, center punch hole)..."
 cp -rf "$DEVICE_DIR/overlays/"* "$OVERLAY_TARGET/" 2>/dev/null || true
 
+# 4.6 Prevent Oplus TEE & Keystore bootloop
+echo " -> Neutralizing conflicting Oplus TEE / Keystore triggers in init scripts..."
+find "$WORK_DIR" -type f -name "*.rc" | while read -r rcfile; do
+    if grep -q "oplus_teesim_daemon" "$rcfile"; then
+        sed -i 's/service oplus_teesim_daemon/service oplus_teesim_daemon \/system\/bin\/true\n    disabled/g' "$rcfile"
+    fi
+done
+
 # ------------------------------------------------------------------------------
 # Step 5: Repack Partitions (EROFS or EXT4)
 # ------------------------------------------------------------------------------

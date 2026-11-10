@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 OUT_IMAGES="$ROOT_DIR/build/out_images"
 OUT_DIR="$ROOT_DIR/out"
-LPMAKE="$ROOT_DIR/bin/lpmake"
+LPMAKE="$ROOT_DIR/bin/lpmake"`nexport LD_LIBRARY_PATH="$ROOT_DIR/bin/lib64:${LD_LIBRARY_PATH:-}"
 INSTALLER_DIR="$ROOT_DIR/installer"
 
 [ ! -x "$LPMAKE" ] && LPMAKE="lpmake"

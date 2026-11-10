@@ -1,5 +1,5 @@
 # ==============================================================================
-# ColorOS 17 Flagship Performance & Smoothness Tweaks for Galaxy M51 (SM7150)
+# ColorOS 17 Flagship Performance & Boot Stability Tweaks for Galaxy M51 (SM7150)
 # Donor: OnePlus 13 (PJZ110 - Snapdragon 8 Elite Flagship Tier)
 # Tuned for maximum 60fps fluidity, Parallel Processing 2.0, full blurs, zero-lag
 # ==============================================================================
@@ -28,6 +28,9 @@ ro.oplus.image.my_product.media.spec=flagship_pro
 # SurfaceFlinger Buffer & Latching Scheduling for Butter-Smooth Gestures
 debug.sf.latch_unsignaled=1
 debug.sf.predict_hwc_composition_strategy=1
+debug.sf.disable_backpressure=1
+ro.surface_flinger.protected_contents=false
+vendor.gralloc.disable_ubwc=1
 debug.sf.high_fps_late_app_phase_offset_ns=1000000
 debug.sf.high_fps_late_sf_phase_offset_ns=1000000
 debug.sf.early_phase_offset_ns=1500000
@@ -73,8 +76,15 @@ profiler.force_disable_err_rpt=1
 profiler.force_disable_ulog=1
 
 # ------------------------------------------------------------------------------
-# 4. Fingerprint & Biometrics (M51 Side-Mounted Physical Capacitive Sensor)
+# 4. Boot Stability & Cross-OEM Compatibility (Anti-Bootloop)
 # ------------------------------------------------------------------------------
+# Disable strict shared UID verification to prevent PackageManager crash
+ro.pm.preload.shared_uid=true
+persist.sys.strict_op_enable=false
+ro.oplus.teesim.enable=0
+persist.sys.oplus.teesim=0
+
+# Fingerprint & Biometrics (M51 Side-Mounted Physical Capacitive Sensor)
 ro.oplus.display.fp.type=0
 persist.vendor.fingerprint.type=side
 persist.sys.fp.optical=false
