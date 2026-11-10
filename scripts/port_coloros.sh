@@ -2,7 +2,7 @@
 set -e
 
 # ==============================================================================
-# Master Porting Engine: ColorOS 17 Flagship for Samsung Galaxy M51 (SM7150)
+# Master Porting Engine: ColorOS 17 OnePlus 13 (PJZ110) for Galaxy M51 (SM7150)
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,19 +19,20 @@ ENABLE_KSU="${ENABLE_KSU:-true}"
 
 echo "======================================================================"
 echo " Starting ColorOS 17 Flagship Port for Samsung Galaxy M51"
+echo " Donor: OnePlus 13 (PJZ110 - Snapdragon 8 Elite Flagship Base)"
 echo " Repack Filesystem: $REPACK_TYPE | KernelSU: $ENABLE_KSU"
 echo "======================================================================"
 
 mkdir -p "$BUILD_DIR" "$DONOR_EXTRACT" "$BASE_EXTRACT" "$WORK_DIR" "$OUT_IMAGES"
 
 # ------------------------------------------------------------------------------
-# Step 1: Extract Donor ROM (Flagship ColorOS)
+# Step 1: Extract Donor ROM (OnePlus 13 Flagship ColorOS 17)
 # ------------------------------------------------------------------------------
-echo "[1/6] Extracting Flagship ColorOS Donor Firmware..."
+echo "[1/6] Extracting OnePlus 13 Flagship ColorOS 17 Donor Firmware..."
 DONOR_ARCHIVE=$(find "$ROOT_DIR/input/donor" -type f \( -name "*.zip" -o -name "*.bin" -o -name "*.tar*" \) | head -n 1)
 
 if [ -z "$DONOR_ARCHIVE" ]; then
-    echo "[ERROR] No donor ROM found in input/donor! Please provide a flagship ColorOS firmware."
+    echo "[ERROR] No donor ROM found in input/donor! Please provide OnePlus 13 ColorOS 17 firmware."
     exit 1
 fi
 
@@ -68,7 +69,7 @@ fi
 # ------------------------------------------------------------------------------
 echo "[3/6] Unpacking partitions for modification..."
 
-DONOR_PARTITIONS=(system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload)
+DONOR_PARTITIONS=(system system_ext product my_product my_stock my_heytap my_carrier my_region my_bigball my_manifest my_company my_preload my_engineering)
 
 for part in "${DONOR_PARTITIONS[@]}"; do
     IMG_FILE="$DONOR_EXTRACT/${part}.img"
@@ -77,7 +78,6 @@ for part in "${DONOR_PARTITIONS[@]}"; do
     
     if [ -f "$IMG_FILE" ]; then
         echo " -> Extracting $part.img..."
-        # Try extract.erofs, then 7z
         if [ -x "$ROOT_DIR/bin/extract.erofs" ]; then
             "$ROOT_DIR/bin/extract.erofs" -i "$IMG_FILE" -x -T "$PART_DIR" 2>/dev/null || 7z x "$IMG_FILE" -o"$PART_DIR" -y >/dev/null 2>&1 || true
         else
@@ -119,7 +119,7 @@ fi
 
 # 4.2 Performance, Fluidity & Blur Preservation Tweaks
 if [ -d "$WORK_DIR/system" ]; then
-    echo " -> Injecting zero-lag performance & full blur tweaks..."
+    echo " -> Injecting OnePlus 13 zero-lag performance & full blur tweaks..."
     cat "$DEVICE_DIR/tweaks.prop" >> "$WORK_DIR/system/system/build.prop" 2>/dev/null || \
     cat "$DEVICE_DIR/tweaks.prop" >> "$WORK_DIR/system/build.prop" 2>/dev/null || true
 fi
@@ -127,7 +127,6 @@ fi
 # 4.3 Prune Heavy Telemetry & Background Logger Daemons (Zero-Lag Engine)
 echo " -> Pruning heavy background logging & telemetry daemons..."
 while IFS= read -r line || [ -n "$line" ]; do
-    # Skip comments and empty lines
     [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
     TARGET_PATH="$WORK_DIR/$line"
     if [ -e "$TARGET_PATH" ]; then
@@ -168,7 +167,6 @@ for part in "${DONOR_PARTITIONS[@]}"; do
         if [ "$REPACK_TYPE" = "EROFS" ]; then
             mkfs.erofs -z lz4hc,9 -C 65536 "$OUT_IMG" "$PART_DIR"
         else
-            # Calculate required size with 15% headroom
             SIZE_KB=$(du -sk "$PART_DIR" | cut -f1)
             SIZE_BYTES=$(( (SIZE_KB + (SIZE_KB * 15 / 100)) * 1024 ))
             make_ext4fs -l "$SIZE_BYTES" -s "$OUT_IMG" "$PART_DIR" 2>/dev/null || \

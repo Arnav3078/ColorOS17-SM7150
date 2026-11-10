@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       donor_url:
-        description: "ColorOS Flagship Donor ROM URL (OnePlus 12 / Find X7 Ultra zip or payload.bin)"
+        description: "ColorOS 17 Flagship Donor ROM URL (OnePlus 13 PJZ110 zip or payload.bin)"
         required: true
-        default: "https://oxygenos.oneplus.net/OP12_ColorOS_Latest_Flagship_firmware.zip"
+        default: "https://oxygenos.oneplus.net/OP13_PJZ110_ColorOS17_Official_Payload.zip"
         type: string
       base_url:
         description: "Galaxy M51 Base Vendor Firmware URL (SM7150 / SM-M515F vendor package)"
@@ -81,7 +81,7 @@ jobs:
         run: |
           mkdir -p input/donor input/base
           
-          echo "Downloading ColorOS Flagship Donor ROM..."
+          echo "Downloading OnePlus 13 (PJZ110) ColorOS 17 Flagship Donor ROM..."
           if [[ "${{ inputs.donor_url }}" =~ ^https?:// ]]; then
             aria2c -x 16 -s 16 -j 4 --continue=true --out="donor_rom.zip" "${{ inputs.donor_url }}" -d input/donor || \
             wget -c -O input/donor/donor_rom.zip "${{ inputs.donor_url }}"
@@ -124,13 +124,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0-ColorOS17-M51-${{ github.run_number }}
-          name: "ColorOS 17 Flagship Port for Galaxy M51 (Build #${{ github.run_number }})"
+          name: "ColorOS 17 OnePlus 13 Flagship Port for Galaxy M51 (Build #${{ github.run_number }})"
           body: |
             ## ColorOS 17 Flagship Port for Samsung Galaxy M51 (`m51` / `sm7150`)
             
             ### 🌟 Features:
-            - **Base**: ColorOS Flagship (Snapdragon 8 Gen 3 Flagship donor).
-            - **Animations**: 100% Full Flagship Parallel Processing Animation Engine, Gaussian Blur, Fluid Cloud / Aqua Dynamics, and Lockscreen Depth Effects.
+            - **Base**: OnePlus 13 (`PJZ110`) Snapdragon 8 Elite Flagship ColorOS 17.
+            - **Animations**: 100% Full Flagship Parallel Processing 2.0 Animation Engine, Tidal Engine, Gaussian Blur, Fluid Cloud / Aqua Dynamics, and Lockscreen Depth Effects.
             - **Optimization**: Zero-Lag tuning for Snapdragon 730G — telemetry, heavy profiling daemons, and background bloat stripped without touching animations.
             - **Hardware**: Complete HAL mapping for AMOLED 60Hz display, 7000mAh battery curve, side capacitive fingerprint sensor, sensors, audio, and camera.
             - **Known Issues**: VoLTE not working (standard LTE mobile data, SMS, Wi-Fi, BT fully working).

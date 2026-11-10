@@ -17,9 +17,9 @@
 
 # What is ColorOS for SM7150?
 ColorOS for SM7150 is a custom firmware port for Samsung Galaxy SM7150 devices (Galaxy M51 / Galaxy A71), designed to bring a smooth, refined and complete ColorOS experience without compromising on animations, blur effects, or performance.
-It is ported from Qualcomm Snapdragon flagship firmware (OnePlus 12 / OPPO Find X7 Ultra) and integrates device-specific hardware adaptations for the Snapdragon 730/730G platform.
+It is ported directly from OnePlus 13 (PJZ110) Qualcomm Snapdragon 8 Elite flagship firmware and integrates device-specific hardware adaptations for the Snapdragon 730/730G platform.
 
-The build system runs completely through GitHub Actions, automatically downloading firmware components, extracting system and vendor images, applying device patches, and generating flashable dynamic partition zip packages.
+The build system automatically downloads firmware components, extracts system and vendor images, applies device patches, and generates flashable dynamic partition zip packages.
 
 The goal is to deliver a fast, responsive and modern UX with full Gaussian blur, high-end parallel animations, and daily driver usability.
 
@@ -27,9 +27,9 @@ Any form of contribution, suggestions, bug report or feature request for the pro
 
 # Features
 ### Core features:
-- Based on official Snapdragon Flagship ColorOS 17 firmware
+- Based on official OnePlus 13 (PJZ110) ColorOS 17 flagship firmware
 - EROFS powered dynamic partitions
-- Flagship Parallel Processing animation engine
+- Flagship Parallel Processing 2.0 animation engine & Tidal Engine
 - Native/live blur support (Control Center, folders, lockscreen)
 - Aqua Dynamics and Fluid Cloud status notifications
 - Luxury lockscreen depth effect & customizable AOD

@@ -1,6 +1,7 @@
 # ==============================================================================
-# ColorOS 17 Performance & Smoothness Tweaks for Galaxy M51 (SM7150 / SM-M515F)
-# Designed for maximum fluidity, 60fps animations, full Gaussian blurs, zero-lag
+# ColorOS 17 Flagship Performance & Smoothness Tweaks for Galaxy M51 (SM7150)
+# Donor: OnePlus 13 (PJZ110 - Snapdragon 8 Elite Flagship Tier)
+# Tuned for maximum 60fps fluidity, Parallel Processing 2.0, full blurs, zero-lag
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -10,14 +11,19 @@
 persist.sys.sf.disable_blur=0
 ro.surface_flinger.supports_background_blur=1
 persist.sys.dynamic_blur=true
-
-# Keep ColorOS Flagship Parallel Processing Animation Engine active
-persist.sys.oplus.animation_level=high
-persist.sys.oplus.anim_performance=1
 persist.sys.oplus.blur_style=flagship
 ro.oplus.systemui.enable_advanced_blur=true
+
+# OnePlus 13 Flagship Parallel Processing 2.0 & Tidal Engine
+persist.sys.oplus.animation_level=high
+persist.sys.oplus.anim_performance=1
+persist.sys.oplus.parallel_engine=2
+persist.sys.oplus.tidal_engine=true
+persist.sys.oplus.anim_velocity_curve=flagship
 persist.sys.oplus.fluid_cloud=true
 persist.sys.oplus.aqua_dynamics=true
+ro.oplus.feature.flagship=true
+ro.oplus.image.my_product.media.spec=flagship_pro
 
 # SurfaceFlinger Buffer & Latching Scheduling for Butter-Smooth Gestures
 debug.sf.latch_unsignaled=1
