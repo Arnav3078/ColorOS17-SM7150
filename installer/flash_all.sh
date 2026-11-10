@@ -13,9 +13,10 @@ read -p "Press [Enter] to begin flashing..."
 echo "[1/4] Checking device connection..."
 fastboot devices
 
-echo "[2/4] Flashing Boot & DTBO..."
+echo "[2/4] Flashing Boot, DTBO & VBMETA..."
 [ -f "boot.img" ] && fastboot flash boot boot.img
 [ -f "dtbo.img" ] && fastboot flash dtbo dtbo.img
+[ -f "vbmeta.img" ] && fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
 
 echo "[3/4] Flashing Dynamic Partitions..."
 if [ -f "super.img" ]; then

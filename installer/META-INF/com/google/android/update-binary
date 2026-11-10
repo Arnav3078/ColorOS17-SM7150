@@ -42,6 +42,14 @@ if [ -f "$WORKDIR/dtbo.img" ]; then
     rm -f "$WORKDIR/dtbo.img"
 fi
 
+# Flashing vbmeta (AVB disabled)
+ui_print "- Extracting & Flashing AVB-Disabled VBMETA..."
+unzip -o "$ZIPFILE" vbmeta.img -d "$WORKDIR" >/dev/null 2>&1 || true
+if [ -f "$WORKDIR/vbmeta.img" ]; then
+    dd if="$WORKDIR/vbmeta.img" of=/dev/block/bootdevice/by-name/vbmeta bs=4M 2>/dev/null || true
+    rm -f "$WORKDIR/vbmeta.img"
+fi
+
 # Flashing dynamic partitions
 ui_print "- Extracting & Flashing Dynamic Super Partition (may take a few minutes)..."
 unzip -o "$ZIPFILE" super.img -d "$WORKDIR" >/dev/null 2>&1 || true
@@ -66,6 +74,14 @@ else
 fi
 
 rm -rf "$WORKDIR"
+
+# Clean cache & stale runtime configs
+ui_print "- Cleaning stale caches and tombstones..."
+rm -rf /data/dalvik-cache/* 2>/dev/null || true
+rm -rf /data/system/package_cache/* 2>/dev/null || true
+rm -rf /data/system/display_settings.xml 2>/dev/null || true
+rm -rf /data/tombstones/* 2>/dev/null || true
+rm -rf /cache/* 2>/dev/null || true
 
 ui_print " "
 ui_print "*****************************************************"

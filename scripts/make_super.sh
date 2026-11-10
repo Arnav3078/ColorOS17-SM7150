@@ -85,6 +85,7 @@ cp -f "$INSTALLER_DIR/flash_all.sh" "$ZIP_TEMP/"
 # Copy firmware / boot images
 [ -f "$OUT_IMAGES/boot.img" ] && cp -f "$OUT_IMAGES/boot.img" "$ZIP_TEMP/boot.img"
 [ -f "$OUT_IMAGES/dtbo.img" ] && cp -f "$OUT_IMAGES/dtbo.img" "$ZIP_TEMP/dtbo.img"
+[ -f "$OUT_IMAGES/vbmeta.img" ] && cp -f "$OUT_IMAGES/vbmeta.img" "$ZIP_TEMP/vbmeta.img" || ([ -f "$INSTALLER_DIR/vbmeta.img" ] && cp -f "$INSTALLER_DIR/vbmeta.img" "$ZIP_TEMP/vbmeta.img" || true)
 
 if [ -f "$OUT_IMAGES/super.img" ]; then
     cp -f "$OUT_IMAGES/super.img" "$ZIP_TEMP/super.img"

@@ -214,7 +214,8 @@ if [ -f "$BASE_EXTRACT/odm.img" ]; then
     cp -f "$BASE_EXTRACT/odm.img" "$OUT_IMAGES/odm.img"
 fi
 if [ -f "$BASE_EXTRACT/boot.img" ]; then
-    echo " -> Preparing Base boot.img..."
+    echo " -> Patching Base boot.img ramdisk fstab & permissive cmdline..."
+    python3 "$SCRIPT_DIR/patch_boot.py" "$BASE_EXTRACT/boot.img" "$OUT_IMAGES/boot.img" || \
     cp -f "$BASE_EXTRACT/boot.img" "$OUT_IMAGES/boot.img"
 fi
 if [ -f "$BASE_EXTRACT/dtbo.img" ]; then

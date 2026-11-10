@@ -14,7 +14,7 @@ echo [1/4] Checking device connection...
 fastboot devices
 echo.
 
-echo [2/4] Flashing Boot & DTBO...
+echo [2/4] Flashing Boot, DTBO & VBMETA...
 if exist boot.img (
     echo - Flashing boot.img...
     fastboot flash boot boot.img
@@ -22,6 +22,10 @@ if exist boot.img (
 if exist dtbo.img (
     echo - Flashing dtbo.img...
     fastboot flash dtbo dtbo.img
+)
+if exist vbmeta.img (
+    echo - Flashing vbmeta.img (disabling AVB)...
+    fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img
 )
 
 echo.
